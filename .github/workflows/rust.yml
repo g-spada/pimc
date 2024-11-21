@@ -20,3 +20,7 @@ jobs:
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
+    - name: Lint Code
+      run: cargo clippy -- -D warnings
+    - name: Format Check
+      run: cargo fmt -- --check 
