@@ -1,4 +1,4 @@
-use ndarray::{arr1, s, Array3, ArrayView1, ArrayViewMut1};
+use ndarray::{arr1, s, Array2, Array3, ArrayView1, ArrayView2, ArrayViewMut1};
 
 /// WorldLines struct to store particle positions using ndarray.
 ///
@@ -138,6 +138,134 @@ impl WorldLines {
             .slice_mut(s![particle, time_slice, ..])
             .assign(&arr1(bead_position));
     }
+
+    /// Gets a 2D view of the positions for a specific particle across a range of time slices.
+    ///
+    /// # Arguments
+    /// * `particle` - Index of the particle.
+    /// * `start_slice` - Starting index of the time slice (inclusive).
+    /// * `end_slice` - Ending index of the time slice (exclusive).
+    ///
+    /// # Returns
+    /// A 2D array view of the positions for the specified particle and time slice range.
+    ///
+    /// # Panics
+    /// Panics if:
+    /// - The `particle` index is out of bounds.
+    /// - The `start_slice` or `end_slice` indices are out of bounds.
+    /// - `start_slice >= end_slice`.
+    ///
+    /// # Example
+    /// ```
+    /// use path_state::WorldLines;
+    /// use ndarray::array;
+    ///
+    /// let mut world = WorldLines::new(2, 5, 3); // 2 particles, 5 time slices, 3D space
+    /// world.set_position(0, 0, &[1.0, 2.0, 3.0]);
+    /// world.set_position(0, 1, &[4.0, 5.0, 6.0]);
+    ///
+    /// // Retrieve positions from slice 0 to 2 (exclusive)
+    /// let positions = world.get_positions(0, 0, 2);
+    /// assert_eq!(positions, array![[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]);
+    /// ```
+    pub fn get_positions(
+        &self,
+        particle: usize,
+        start_slice: usize,
+        end_slice: usize,
+    ) -> ArrayView2<f64> {
+        assert!(
+            particle < self.positions.shape()[0],
+            "Particle index out of bounds: particle={}, max allowed={}",
+            particle,
+            self.positions.shape()[0] - 1
+        );
+        assert!(
+            start_slice < end_slice,
+            "Invalid slice range: start_slice ({}) must be less than end_slice ({})",
+            start_slice,
+            end_slice
+        );
+        assert!(
+            end_slice <= self.positions.shape()[1],
+            "Time slice range out of bounds: end_slice={}, max allowed={}",
+            end_slice,
+            self.positions.shape()[1]
+        );
+
+        // Extract and return a 2D view using slicing
+        self.positions
+            .slice(s![particle, start_slice..end_slice, ..])
+    }
+
+    /// Sets the positions for a specific particle across a range of time slices.
+    ///
+    /// # Arguments
+    /// * `particle` - Index of the particle.
+    /// * `start_slice` - Starting index of the time slice (inclusive).
+    /// * `end_slice` - Ending index of the time slice (exclusive).
+    /// * `positions` - A 2D array with shape `(end_slice - start_slice, spatial_dim)` containing the new positions.
+    ///
+    /// # Panics
+    /// Panics if:
+    /// - The `particle` index is out of bounds.
+    /// - The `start_slice` or `end_slice` indices are out of bounds.
+    /// - The `positions` array shape does not match `(end_slice - start_slice, spatial_dim)`.
+    ///
+    /// # Example
+    /// ```
+    /// use path_state::WorldLines;
+    /// use ndarray::array;
+    ///
+    /// let mut world = WorldLines::new(2, 5, 3); // 2 particles, 5 time slices, 3D space
+    ///
+    /// // Set positions for slices 0 to 2 (exclusive) for particle 0
+    /// let new_positions = array![[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]];
+    /// world.set_positions(0, 0, 2, &new_positions);
+    ///
+    /// // Verify the changes
+    /// let positions = world.get_positions(0, 0, 2);
+    /// assert_eq!(positions, new_positions);
+    /// ```
+    pub fn set_positions(
+        &mut self,
+        particle: usize,
+        start_slice: usize,
+        end_slice: usize,
+        positions: &Array2<f64>,
+    ) {
+        assert!(
+            particle < self.positions.shape()[0],
+            "Particle index out of bounds: particle={}, max allowed={}",
+            particle,
+            self.positions.shape()[0] - 1
+        );
+        assert!(
+            start_slice < end_slice,
+            "Invalid slice range: start_slice ({}) must be less than end_slice ({})",
+            start_slice,
+            end_slice
+        );
+        assert!(
+            end_slice <= self.positions.shape()[1],
+            "Time slice range out of bounds: end_slice={}, max allowed={}",
+            end_slice,
+            self.positions.shape()[1]
+        );
+        assert_eq!(
+            positions.shape(),
+            &[end_slice - start_slice, self.positions.shape()[2]],
+            "Input positions shape mismatch: expected ({}, {}), got {:?}",
+            end_slice - start_slice,
+            self.positions.shape()[2],
+            positions.shape()
+        );
+
+        // Perform bulk assignment using slice and `assign`
+        self.positions
+            .slice_mut(s![particle, start_slice..end_slice, ..])
+            .assign(positions);
+    }
 }
 
 #[cfg(test)]
@@ -206,5 +334,66 @@ mod tests {
         // Verify the modification
         let position = world.get_position(0, 0);
         assert_eq!(position, array![3.0, 4.0]);
+    }
+    #[test]
+    fn test_get_positions() {
+        let mut world = WorldLines::new(2, 5, 3); // 2 particles, 5 time slices, 3D space
+
+        // Set positions for particle 0, slices 0 to 2
+        world.set_position(0, 0, &[1.0, 2.0, 3.0]);
+        world.set_position(0, 1, &[4.0, 5.0, 6.0]);
+
+        // Get positions for slices 0 to 2 (exclusive) for particle 0
+        let positions = world.get_positions(0, 0, 2);
+        assert_eq!(positions, array![[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]);
+
+        //// Test out-of-bounds particle index (should panic)
+        //let result = std::panic::catch_unwind(|| {
+            //world.get_positions(2, 0, 2);
+        //});
+        //assert!(result.is_err());
+
+        //// Test invalid slice range (should panic)
+        //let result = std::panic::catch_unwind(|| {
+            //world.get_positions(0, 3, 1);
+        //});
+        //assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_set_positions() {
+        let mut world = WorldLines::new(2, 5, 3); // 2 particles, 5 time slices, 3D space
+
+        // Create a 2D array with new positions for slices 0 to 2
+        let new_positions = array![
+            [1.0, 2.0, 3.0], // Slice 0
+            [4.0, 5.0, 6.0], // Slice 1
+        ];
+
+        // Set positions for particle 0, slices 0 to 2
+        world.set_positions(0, 0, 2, &new_positions);
+
+        // Verify the changes using get_positions
+        let positions = world.get_positions(0, 0, 2);
+        assert_eq!(positions, new_positions);
+
+        //// Test invalid particle index (should panic)
+        //let result = std::panic::catch_unwind(|| {
+            //world.set_positions(2, 0, 2, &new_positions);
+        //});
+        //assert!(result.is_err());
+
+        //// Test invalid slice range (should panic)
+        //let result = std::panic::catch_unwind(|| {
+            //world.set_positions(0, 3, 1, &new_positions);
+        //});
+        //assert!(result.is_err());
+
+        //// Test shape mismatch (should panic)
+        //let invalid_positions = array![[1.0, 2.0], [4.0, 5.0]]; // Mismatched spatial dimensions
+        //let result = std::panic::catch_unwind(|| {
+            //world.set_positions(0, 0, 2, &invalid_positions);
+        //});
+        //assert!(result.is_err());
     }
 }
