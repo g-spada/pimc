@@ -170,42 +170,26 @@ mod tests {
     }
 
     //#[ignore]
-    //#[test]
-    //fn test_get_position_mut() {
-        //let mut world = WorldLines::new(2, 3, 3);
-        //{
-            //// Modify position using mutable reference
-            //let mut position = world.get_position_mut(0, 0);
-            //position.assign(&array![4.0, 5.0, 6.0]);
-        //}
+    #[test]
+    fn test_get_position_mut() {
+        let mut world = WorldLines::new(2, 3, 3);
+        {
+            // Modify position using mutable reference
+            let mut position = world.get_position_mut(0, 0);
+            position.assign(&array![4.0, 5.0, 6.0]);
+        }
 
-        //// Verify the change
-        //let position = world.get_position(0, 0);
-        //assert_eq!(position, array![4.0, 5.0, 6.0]);
+        // Verify the change
+        let position = world.get_position(0, 0);
+        assert_eq!(position, array![4.0, 5.0, 6.0]);
+    }
 
-        //// Test out-of-bounds mutable access (should panic)
-        //let result = std::panic::catch_unwind(|| world.get_position_mut(0, 3));
-        //assert!(result.is_err());
-    //}
-
-    //#[ignore]
-    //#[test]
-    //fn test_set_position() {
-        //let mut world = WorldLines::new(2, 3, 3);
-
-        //// Set valid position
-        //world.set_position(1, 2, &[7.0, 8.0, 9.0]);
-        //let position = world.get_position(1, 2);
-        //assert_eq!(position, array![7.0, 8.0, 9.0]);
-
-        //// Test invalid bead position length (should panic)
-        //let result = std::panic::catch_unwind(|| world.set_position(1, 2, &[1.0, 2.0]));
-        //assert!(result.is_err());
-
-        //// Test out-of-bounds indices (should panic)
-        //let result = std::panic::catch_unwind(|| world.set_position(3, 0, &[1.0, 2.0, 3.0]));
-        //assert!(result.is_err());
-    //}
+    #[test]
+    #[should_panic]
+    fn test_invalid_arguments_get_position_mut() {
+        let mut world = WorldLines::new(2, 3, 2);
+        world.get_position_mut(1,3);
+    }
 
     #[test]
     fn test_combined_operations() {
