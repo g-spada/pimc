@@ -1,4 +1,4 @@
-use ndarray::{Array3, ArrayView1, ArrayViewMut1, s};
+use ndarray::{arr1, s, Array3, ArrayView1, ArrayViewMut1};
 
 /// WorldLines struct to store particle positions using ndarray.
 ///
@@ -133,9 +133,10 @@ impl WorldLines {
             bead_position.len()
         );
 
-        for (i, &val) in bead_position.iter().enumerate() {
-            self.positions[[particle, time_slice, i]] = val;
-        }
+        // Efficiently set the position using the higher order `assign` function
+        self.positions
+            .slice_mut(s![particle, time_slice, ..])
+            .assign(&arr1(bead_position));
     }
 }
 
@@ -188,7 +189,7 @@ mod tests {
     #[should_panic]
     fn test_invalid_arguments_get_position_mut() {
         let mut world = WorldLines::new(2, 3, 2);
-        world.get_position_mut(1,3);
+        world.get_position_mut(1, 3);
     }
 
     #[test]
@@ -207,4 +208,3 @@ mod tests {
         assert_eq!(position, array![3.0, 4.0]);
     }
 }
-
