@@ -1,4 +1,8 @@
 use ndarray::{arr1, s, Array, Array2, ArrayView1, ArrayView2, ArrayViewMut1, Dim};
+use serde::{Deserialize, Serialize};
+use serde_json;
+use std::fs::File;
+use std::io::{self, BufReader, BufWriter};
 
 /// WorldLines struct to store particle positions using ndarray.
 ///
@@ -17,15 +21,16 @@ use ndarray::{arr1, s, Array, Array2, ArrayView1, ArrayView2, ArrayViewMut1, Dim
 /// assert_eq!(position.to_vec(), vec![1.0, 2.0, 3.0]);
 /// ```
 ///
+#[derive(Serialize, Deserialize)]
 pub struct WorldLines<const N: usize, const M: usize, const D: usize> {
     /// Multidimensional array with const generics dimensions
     /// (N particles, M time slices, D spatial dimensions).
     positions: Array<f64, Dim<[usize; 3]>>,
 }
 
-impl<const N: usize, const M: usize, const D: usize> WorldLines<N,M,D> {
+impl<const N: usize, const M: usize, const D: usize> WorldLines<N, M, D> {
     /// Creates a new `WorldLines` instance with all positions initialized to zero.
-        pub fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             positions: Array::zeros((N, M, D)),
         }
@@ -256,6 +261,21 @@ impl<const N: usize, const M: usize, const D: usize> WorldLines<N,M,D> {
             .slice_mut(s![particle, start_slice..end_slice, ..])
             .assign(positions);
     }
+    /// Saves the WorldLines instance to a file in JSON format.
+    pub fn save_to_file(&self, filename: &str) -> io::Result<()> {
+        let file = File::create(filename)?;
+        let writer = BufWriter::new(file);
+        serde_json::to_writer(writer, &self)?;
+        Ok(())
+    }
+
+    /// Loads a WorldLines instance from a JSON file.
+    pub fn load_from_file(filename: &str) -> io::Result<Self> {
+        let file = File::open(filename)?;
+        let reader = BufReader::new(file);
+        let world_lines = serde_json::from_reader(reader)?;
+        Ok(world_lines)
+    }
 }
 
 #[cfg(test)]
@@ -266,13 +286,13 @@ mod tests {
     #[test]
     fn test_new_worldlines() {
         // Test valid initialization
-        let world = WorldLines::<2,3,3>::new(); // 2 particles, 3 time slices, 3D
+        let world = WorldLines::<2, 3, 3>::new(); // 2 particles, 3 time slices, 3D
         assert_eq!(world.positions.shape(), &[2, 3, 3]);
     }
-    
+
     #[test]
     fn test_get_position() {
-        let mut world = WorldLines::<2,3,3>::new();
+        let mut world = WorldLines::<2, 3, 3>::new();
         world.set_position(0, 0, &[1.0, 2.0, 3.0]);
 
         // Retrieve position
@@ -287,7 +307,7 @@ mod tests {
     //#[ignore]
     #[test]
     fn test_get_position_mut() {
-        let mut world = WorldLines::<2,3,3>::new();
+        let mut world = WorldLines::<2, 3, 3>::new();
         {
             // Modify position using mutable reference
             let mut position = world.get_position_mut(0, 0);
@@ -302,13 +322,13 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_invalid_arguments_get_position_mut() {
-        let mut world = WorldLines::<2,3,2>::new();
+        let mut world = WorldLines::<2, 3, 2>::new();
         world.get_position_mut(1, 3);
     }
 
     #[test]
     fn test_combined_operations() {
-        let mut world = WorldLines::<1,1,2>::new(); // 1 particle, 1 time slice, 2D
+        let mut world = WorldLines::<1, 1, 2>::new(); // 1 particle, 1 time slice, 2D
 
         // Initial position should be zero
         let position = world.get_position(0, 0);
@@ -323,7 +343,7 @@ mod tests {
     }
     #[test]
     fn test_get_positions() {
-        let mut world = WorldLines::<2,5,3>::new(); // 2 particles, 5 time slices, 3D space
+        let mut world = WorldLines::<2, 5, 3>::new(); // 2 particles, 5 time slices, 3D space
 
         // Set positions for particle 0, slices 0 to 2
         world.set_position(0, 0, &[1.0, 2.0, 3.0]);
@@ -335,20 +355,20 @@ mod tests {
 
         //// Test out-of-bounds particle index (should panic)
         //let result = std::panic::catch_unwind(|| {
-            //world.get_positions(2, 0, 2);
+        //world.get_positions(2, 0, 2);
         //});
         //assert!(result.is_err());
 
         //// Test invalid slice range (should panic)
         //let result = std::panic::catch_unwind(|| {
-            //world.get_positions(0, 3, 1);
+        //world.get_positions(0, 3, 1);
         //});
         //assert!(result.is_err());
     }
 
     #[test]
     fn test_set_positions() {
-        let mut world = WorldLines::<2,5,3>::new(); // 2 particles, 5 time slices, 3D space
+        let mut world = WorldLines::<2, 5, 3>::new(); // 2 particles, 5 time slices, 3D space
 
         // Create a 2D array with new positions for slices 0 to 2
         let new_positions = array![
@@ -365,20 +385,20 @@ mod tests {
 
         //// Test invalid particle index (should panic)
         //let result = std::panic::catch_unwind(|| {
-            //world.set_positions(2, 0, 2, &new_positions);
+        //world.set_positions(2, 0, 2, &new_positions);
         //});
         //assert!(result.is_err());
 
         //// Test invalid slice range (should panic)
         //let result = std::panic::catch_unwind(|| {
-            //world.set_positions(0, 3, 1, &new_positions);
+        //world.set_positions(0, 3, 1, &new_positions);
         //});
         //assert!(result.is_err());
 
         //// Test shape mismatch (should panic)
         //let invalid_positions = array![[1.0, 2.0], [4.0, 5.0]]; // Mismatched spatial dimensions
         //let result = std::panic::catch_unwind(|| {
-            //world.set_positions(0, 0, 2, &invalid_positions);
+        //world.set_positions(0, 0, 2, &invalid_positions);
         //});
         //assert!(result.is_err());
     }
