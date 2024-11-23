@@ -261,7 +261,18 @@ impl<const N: usize, const M: usize, const D: usize> WorldLines<N, M, D> {
             .slice_mut(s![particle, start_slice..end_slice, ..])
             .assign(positions);
     }
+
     /// Saves the WorldLines instance to a file in JSON format.
+    ///
+    /// This method serializes the `WorldLines` instance into a human-readable JSON
+    /// format. It is useful for saving the state of the simulation for later analysis.
+    ///
+    /// # Arguments
+    /// * `filename` - Path to the output JSON file.
+    ///
+    /// # Errors
+    /// Returns an error if the file cannot be created or written to.
+    ///
     pub fn save_to_file(&self, filename: &str) -> io::Result<()> {
         let file = File::create(filename)?;
         let writer = BufWriter::new(file);
@@ -270,6 +281,16 @@ impl<const N: usize, const M: usize, const D: usize> WorldLines<N, M, D> {
     }
 
     /// Loads a WorldLines instance from a JSON file.
+    ///
+    /// This method deserializes a JSON file back into a `WorldLines` instance.
+    /// It is useful for restoring a saved simulation state.
+    ///
+    /// # Arguments
+    /// * `filename` - Path to the input JSON file.
+    ///
+    /// # Errors
+    /// Returns an error if the file cannot be read or is invalid.
+    ///
     pub fn load_from_file(filename: &str) -> io::Result<Self> {
         let file = File::open(filename)?;
         let reader = BufReader::new(file);
@@ -382,24 +403,25 @@ mod tests {
         // Verify the changes using get_positions
         let positions = world.get_positions(0, 0, 2);
         assert_eq!(positions, new_positions);
+    }
 
-        //// Test invalid particle index (should panic)
-        //let result = std::panic::catch_unwind(|| {
-        //world.set_positions(2, 0, 2, &new_positions);
-        //});
-        //assert!(result.is_err());
+    #[test]
+    fn test_save_and_load_json_temp() -> io::Result<()> {
+        let mut world = WorldLines::<2, 3, 3>::new();
+        world.set_position(0, 0, &[1.0, 2.0, 3.0]);
 
-        //// Test invalid slice range (should panic)
-        //let result = std::panic::catch_unwind(|| {
-        //world.set_positions(0, 3, 1, &new_positions);
-        //});
-        //assert!(result.is_err());
+        // Use a temporary file for saving
+        use tempfile::NamedTempFile;
+        let temp_file = NamedTempFile::new()?;
+        world.save_to_file(temp_file.path().to_str().unwrap())?;
 
-        //// Test shape mismatch (should panic)
-        //let invalid_positions = array![[1.0, 2.0], [4.0, 5.0]]; // Mismatched spatial dimensions
-        //let result = std::panic::catch_unwind(|| {
-        //world.set_positions(0, 0, 2, &invalid_positions);
-        //});
-        //assert!(result.is_err());
+        // Load from the temporary file
+        let loaded_world =
+            WorldLines::<2, 3, 3>::load_from_file(temp_file.path().to_str().unwrap())?;
+
+        // Verify the data
+        assert_eq!(loaded_world.get_position(0, 0), array![1.0, 2.0, 3.0]);
+
+        Ok(())
     }
 }
