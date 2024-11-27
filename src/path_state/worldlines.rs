@@ -1,4 +1,4 @@
-use ndarray::{arr1, s, Array, Array2, ArrayView1, ArrayView2, ArrayViewMut1, Dim};
+use ndarray::{arr1, s, Array, Array1, Array2, ArrayView1, ArrayView2, ArrayViewMut1, Dim};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::fs::File;
@@ -26,6 +26,10 @@ pub struct WorldLines<const N: usize, const M: usize, const D: usize> {
     /// Multidimensional array with const generics dimensions
     /// (N particles, M time slices, D spatial dimensions).
     positions: Array<f64, Dim<[usize; 3]>>,
+    prev_permutation: Array1<i32>, // -1 for open worldlines
+    next_permutation: Array1<i32>, // -1 for open worldlines
+    worm_head: Option<usize>,
+    worm_tail: Option<usize>,
 }
 
 impl<const N: usize, const M: usize, const D: usize> WorldLines<N, M, D> {
@@ -33,6 +37,10 @@ impl<const N: usize, const M: usize, const D: usize> WorldLines<N, M, D> {
     pub fn new() -> Self {
         Self {
             positions: Array::zeros((N, M, D)),
+            prev_permutation: Array1::from_iter((0..N).map(|i| i as i32)),
+            next_permutation: Array1::from_iter((0..N).map(|i| i as i32)),
+            worm_head: None,
+            worm_tail: None,
         }
     }
 
@@ -49,13 +57,13 @@ impl<const N: usize, const M: usize, const D: usize> WorldLines<N, M, D> {
     /// Panics if the particle or time_slice indices are out of bounds.
     pub fn get_position(&self, particle: usize, time_slice: usize) -> ArrayView1<f64> {
         // Ensure indices are within bounds
-        assert!(
+        debug_assert!(
             particle < N,
             "Particle index out of bounds: particle={}, max allowed={}",
             particle,
             N - 1
         );
-        assert!(
+        debug_assert!(
             time_slice < M,
             "Time slice index out of bounds: time_slice={}, max allowed={}",
             time_slice,
@@ -78,13 +86,13 @@ impl<const N: usize, const M: usize, const D: usize> WorldLines<N, M, D> {
     /// Panics if the particle or time_slice indices are out of bounds.
     pub fn get_position_mut(&mut self, particle: usize, time_slice: usize) -> ArrayViewMut1<f64> {
         // Ensure indices are within bounds
-        assert!(
+        debug_assert!(
             particle < N,
             "Particle index out of bounds: particle={}, max allowed={}",
             particle,
             N - 1
         );
-        assert!(
+        debug_assert!(
             time_slice < M,
             "Time slice index out of bounds: time_slice={}, max allowed={}",
             time_slice,
@@ -106,13 +114,13 @@ impl<const N: usize, const M: usize, const D: usize> WorldLines<N, M, D> {
     /// does not match the spatial dimension `d`.
     pub fn set_position(&mut self, particle: usize, time_slice: usize, bead_position: &[f64]) {
         // Ensure indices are within bounds
-        assert!(
+        debug_assert!(
             particle < N,
             "Particle index out of bounds: particle={}, max allowed={}",
             particle,
             N - 1
         );
-        assert!(
+        debug_assert!(
             time_slice < M,
             "Time slice index out of bounds: time_slice={}, max allowed={}",
             time_slice,
@@ -120,7 +128,7 @@ impl<const N: usize, const M: usize, const D: usize> WorldLines<N, M, D> {
         );
 
         // Ensure the position vector matches the expected spatial dimension
-        assert_eq!(
+        debug_assert_eq!(
             bead_position.len(),
             D,
             "Position length mismatch: expected={}, got={}",
@@ -169,19 +177,19 @@ impl<const N: usize, const M: usize, const D: usize> WorldLines<N, M, D> {
         start_slice: usize,
         end_slice: usize,
     ) -> ArrayView2<f64> {
-        assert!(
+        debug_assert!(
             particle < N,
             "Particle index out of bounds: particle={}, max allowed={}",
             particle,
             N - 1
         );
-        assert!(
+        debug_assert!(
             start_slice < end_slice,
             "Invalid slice range: start_slice ({}) must be less than end_slice ({})",
             start_slice,
             end_slice
         );
-        assert!(
+        debug_assert!(
             end_slice <= M,
             "Time slice range out of bounds: end_slice={}, max allowed={}",
             end_slice,
@@ -229,25 +237,25 @@ impl<const N: usize, const M: usize, const D: usize> WorldLines<N, M, D> {
         end_slice: usize,
         positions: &Array2<f64>,
     ) {
-        assert!(
+        debug_assert!(
             particle < N,
             "Particle index out of bounds: particle={}, max allowed={}",
             particle,
             N - 1
         );
-        assert!(
+        debug_assert!(
             start_slice < end_slice,
             "Invalid slice range: start_slice ({}) must be less than end_slice ({})",
             start_slice,
             end_slice
         );
-        assert!(
+        debug_assert!(
             end_slice <= M,
             "Time slice range out of bounds: end_slice={}, max allowed={}",
             end_slice,
             M
         );
-        assert_eq!(
+        debug_assert_eq!(
             positions.shape(),
             &[end_slice - start_slice, D],
             "Input positions shape mismatch: expected ({}, {}), got {:?}",
@@ -342,6 +350,108 @@ impl<const N: usize, const M: usize, const D: usize> WorldLines<N, M, D> {
         let reader = BufReader::new(file);
         let world_lines = serde_json::from_reader(reader)?;
         Ok(world_lines)
+    }
+
+    /// Sets the previous particle permutation for a given particle.
+    ///
+    /// # Arguments
+    /// * `particle` - The particle index to set.
+    /// * `prev_particle` - `Some(index)` for a valid preceding particle or `None` for an open worldline.
+    ///
+    /// # Panics
+    /// Panics if `particle` is out of bounds or if `prev_particle` is `Some(value)` and `value` is not in the valid range `0..N`.
+    pub fn set_prev_permutation(&mut self, particle: usize, prev_particle: Option<usize>) {
+        debug_assert!(
+            particle < N,
+            "Particle index out of bounds: particle={}, max allowed={}",
+            particle,
+            N - 1
+        );
+
+        match prev_particle {
+            Some(index) => {
+                debug_assert!(
+                    index < N,
+                    "Invalid prev_particle value: must be between 0 and N-1, got {}",
+                    index
+                );
+                self.prev_permutation[particle] = index as i32;
+            }
+            None => {
+                self.prev_permutation[particle] = -1; // Open worldline
+                self.worm_tail = Some(particle);
+            }
+        }
+    }
+
+    /// Sets the next particle permutation for a given particle.
+    ///
+    /// # Arguments
+    /// * `particle` - The particle index to set.
+    /// * `next_particle` - `Some(index)` for a valid preceding particle or `None` for an open worldline.
+    ///
+    /// # Panics
+    /// Panics if `particle` is out of bounds or if `next_particle` is `Some(value)` and `value` is not in the valid range `0..N`.
+    pub fn set_next_permutation(&mut self, particle: usize, next_particle: Option<usize>) {
+        debug_assert!(
+            particle < N,
+            "Particle index out of bounds: particle={}, max allowed={}",
+            particle,
+            N - 1
+        );
+
+        match next_particle {
+            Some(index) => {
+                debug_assert!(
+                    index < N,
+                    "Invalid prev_particle value: must be between 0 and N-1, got {}",
+                    index
+                );
+                self.next_permutation[particle] = index as i32;
+            }
+            None => {
+                self.next_permutation[particle] = -1; // Open worldline
+                self.worm_head = Some(particle);
+            }
+        }
+    }
+
+    /// Gets the previous particle for a given particle.
+    ///
+    /// # Returns
+    /// An `Option<usize>` where:
+    /// * `Some(value)` indicates the preceding particle index.
+    /// * `None` indicates an open worldline (-1).
+    pub fn get_prev_permutation(&self, particle: usize) -> Option<usize> {
+        debug_assert!(
+            particle < N,
+            "Particle index out of bounds: particle={}, max allowed={}",
+            particle,
+            N - 1
+        );
+        match self.prev_permutation[particle] {
+            -1 => None,
+            index => Some(index as usize),
+        }
+    }
+
+    /// Gets the next particle for a given particle.
+    ///
+    /// # Returns
+    /// An `Option<usize>` where:
+    /// * `Some(value)` indicates the following particle index.
+    /// * `None` indicates an open worldline (-1).
+    pub fn get_next_permutation(&self, particle: usize) -> Option<usize> {
+        debug_assert!(
+            particle < N,
+            "Particle index out of bounds: particle={}, max allowed={}",
+            particle,
+            N - 1
+        );
+        match self.next_permutation[particle] {
+            -1 => None,
+            index => Some(index as usize),
+        }
     }
 }
 
