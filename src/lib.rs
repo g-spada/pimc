@@ -1,5 +1,5 @@
-pub mod path_state;
 pub mod mc_updates;
+pub mod path_state;
 
 pub fn greet() {
     println!("Hello, world!");

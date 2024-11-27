@@ -7,7 +7,7 @@ pub enum ParticleState {
 }
 
 //impl Default for ParticleState {
-    //fn default() -> Self {
-        //ParticleState::Up
-    //}
+//fn default() -> Self {
+//ParticleState::Up
+//}
 //}
