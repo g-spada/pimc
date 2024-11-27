@@ -1,3 +1,4 @@
+use super::particlestate::ParticleState;
 use ndarray::{arr1, s, Array, Array1, Array2, Array3, ArrayView1, ArrayView2, ArrayViewMut1};
 use serde::{Deserialize, Serialize};
 use serde_json;
@@ -26,6 +27,7 @@ pub struct WorldLines<const N: usize, const M: usize, const D: usize> {
     /// Multidimensional array with const generics dimensions
     /// (N particles, M time slices, D spatial dimensions).
     positions: Array3<f64>,
+    states: Array2<ParticleState>,
     prev_permutation: Array1<i32>, // -1 for open worldlines
     next_permutation: Array1<i32>, // -1 for open worldlines
     worm_head: Option<usize>,
@@ -37,6 +39,7 @@ impl<const N: usize, const M: usize, const D: usize> WorldLines<N, M, D> {
     pub fn new() -> Self {
         Self {
             positions: Array::zeros((N, M, D)),
+            states: Array::from_elem((N, M), ParticleState::Up),
             prev_permutation: Array1::from_iter((0..N).map(|i| i as i32)),
             next_permutation: Array1::from_iter((0..N).map(|i| i as i32)),
             worm_head: None,
