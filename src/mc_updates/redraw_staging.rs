@@ -3,8 +3,8 @@ use rand::Rng;
 use rand_distr::{Distribution, Normal};
 
 /// Redraws the path between the initial and final slices in `delta_j` links
-/// using Levy's staging algorithm. This function modifies the intermediate
-/// slices of a polymer while keeping the initial and final slices fixed.
+/// using Levy's staging algorithm. This function samples new positions for the
+/// beads at intermediate slices, while keeping the initial and final beads fixed.
 ///
 /// The algorithm samples the free density matrix using Gaussian distributions
 /// to efficiently handle the kinetic term of the quantum propagator.
@@ -16,7 +16,7 @@ use rand_distr::{Distribution, Normal};
 ///   (slices) remain fixed, while intermediate slices are redrawn.
 /// - `two_lambda_tau`: A positive float representing the product of
 ///   \( 2 \lambda = \hbar^2 / ( 2 * m ) \) (related to the quantum kinetic energy scale)
-///   and the time step \( \tau \).
+///   and the imaginary-time step \( \tau \).
 /// - `rng`: A mutable reference to a random number generator implementing the
 ///   `rand::Rng` trait, used to generate random numbers for Gaussian sampling.
 ///
@@ -27,7 +27,7 @@ use rand_distr::{Distribution, Normal};
 ///
 /// # References
 /// - W. Krauth, "Algorithms and Computations," Algorithm 3.5, p.154 (with different normalization).
-/// - Condens. Matter 2022, 7, 30, Eq. (27) [http://arxiv.org/abs/2203.00010]
+/// - Condens. Matter 2022, 7, 30, Eq. (27) [<http://arxiv.org/abs/2203.00010>]
 ///   *Note*: This reference contains a typo in the last denominator (extra π).
 ///
 /// # Example
@@ -55,7 +55,7 @@ pub fn redraw_staging<S, R: Rng>(polymer: &mut ArrayBase<S, Ix2>, two_lambda_tau
 where
     S: DataMut<Elem = f64>,
 {
-    debug_assert!(two_lambda_tau > 0.0, "tau_mass_ratio must be positive");
+    debug_assert!(two_lambda_tau >= 0.0, "two_lambda_tau cannot be negative");
 
     let shape = polymer.shape();
     debug_assert_eq!(shape.len(), 2, "Expected a tensor with 2 indices");
@@ -107,7 +107,32 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "tau_mass_ratio must be positive")]
+    fn test_redraw_staging_deterministic() {
+        let mut polymer = Array2::from_shape_vec(
+            (5, 2),
+            vec![0.0, 0.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0, -8.0, 8.0],
+        )
+        .unwrap();
+
+        // With vanishing two_lambda_tau the sampled positions are deterministic
+        let two_lambda_tau = 0.0;
+        let mut rng = thread_rng();
+
+        // Modify the intermediate slice
+        redraw_staging(&mut polymer, two_lambda_tau, &mut rng);
+
+        // First and last slices should remain unchanged
+        assert_eq!(polymer.row(0).to_vec(), vec![0.0, 0.0]);
+        assert_eq!(polymer.row(4).to_vec(), vec![-8.0, 8.0]);
+
+        // Intermediate slices must lay on a straight line
+        assert_eq!(polymer.row(1).to_vec(), vec![-2.0, 2.0]);
+        assert_eq!(polymer.row(2).to_vec(), vec![-4.0, 4.0]);
+        assert_eq!(polymer.row(3).to_vec(), vec![-6.0, 6.0]);
+    }
+
+    #[test]
+    #[should_panic]
     fn test_redraw_staging_invalid_two_lambda_tau() {
         let mut polymer = Array2::zeros((3, 2));
         let two_lambda_tau = -1.0; // Invalid value
