@@ -34,6 +34,7 @@ pub struct WorldLines<const N: usize, const M: usize, const D: usize> {
     worm_tail: Option<usize>,
 }
 
+#[allow(clippy::new_without_default)]
 impl<const N: usize, const M: usize, const D: usize> WorldLines<N, M, D> {
     /// Creates a new `WorldLines` instance with all positions initialized to zero.
     pub fn new() -> Self {
