@@ -1,4 +1,4 @@
-use ndarray::{arr1, s, Array, Array1, Array2, ArrayView1, ArrayView2, ArrayViewMut1, Dim};
+use ndarray::{arr1, s, Array, Array1, Array2, Array3, ArrayView1, ArrayView2, ArrayViewMut1};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::fs::File;
@@ -21,11 +21,11 @@ use std::io::{self, BufReader, BufWriter};
 /// assert_eq!(position.to_vec(), vec![1.0, 2.0, 3.0]);
 /// ```
 ///
-#[derive(Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct WorldLines<const N: usize, const M: usize, const D: usize> {
     /// Multidimensional array with const generics dimensions
     /// (N particles, M time slices, D spatial dimensions).
-    positions: Array<f64, Dim<[usize; 3]>>,
+    positions: Array3<f64>,
     prev_permutation: Array1<i32>, // -1 for open worldlines
     next_permutation: Array1<i32>, // -1 for open worldlines
     worm_head: Option<usize>,
