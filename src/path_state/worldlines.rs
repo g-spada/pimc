@@ -378,9 +378,16 @@ impl<const N: usize, const M: usize, const D: usize> WorldLines<N, M, D> {
                     "Invalid prev_particle value: must be between 0 and N-1, got {}",
                     index
                 );
+                // Update the permutation
                 self.prev_permutation[particle] = index as i32;
+                // Update worm_tail as neccessary
+                match self.worm_tail {
+                    Some(tail) if tail == particle => self.worm_tail = None,
+                    _ => (),
+                }
             }
             None => {
+                // Set tail
                 self.prev_permutation[particle] = -1; // Open worldline
                 self.worm_tail = Some(particle);
             }
@@ -410,9 +417,16 @@ impl<const N: usize, const M: usize, const D: usize> WorldLines<N, M, D> {
                     "Invalid prev_particle value: must be between 0 and N-1, got {}",
                     index
                 );
+                // Update the permutation
                 self.next_permutation[particle] = index as i32;
+                // Update worm_head as neccessary
+                match self.worm_head {
+                    Some(head) if head == particle => self.worm_head = None,
+                    _ => (),
+                }
             }
             None => {
+                // Set head
                 self.next_permutation[particle] = -1; // Open worldline
                 self.worm_head = Some(particle);
             }
@@ -455,6 +469,26 @@ impl<const N: usize, const M: usize, const D: usize> WorldLines<N, M, D> {
             -1 => None,
             index => Some(index as usize),
         }
+    }
+
+    /// Gets the worm head particle index, if it exists.
+    ///
+    /// # Returns
+    /// An `Option<usize>`:
+    /// * `Some(index)` - The index of the particle acting as the worm head.
+    /// * `None` - If there is no worm head in the current configuration.
+    pub fn get_worm_head(&self) -> Option<usize> {
+        self.worm_head
+    }
+
+    /// Gets the worm tail particle index, if it exists.
+    ///
+    /// # Returns
+    /// An `Option<usize>`:
+    /// * `Some(index)` - The index of the particle acting as the worm head.
+    /// * `None` - If there is no worm head in the current configuration.
+    pub fn get_worm_tail(&self) -> Option<usize> {
+        self.worm_tail
     }
 }
 
@@ -550,6 +584,35 @@ mod tests {
         // Verify the changes using get_positions
         let positions = world.get_positions(0, 0, 2);
         assert_eq!(positions, new_positions);
+    }
+
+    #[test]
+    fn test_set_permutations() {
+        const NP: usize = 4;
+        const NS: usize = 16;
+        const ND: usize = 3;
+        let mut world = WorldLines::<NP, NS, ND>::new();
+
+        // Worldlines are initialized in the Z sector with all 1-cycle permutations
+        for i in 0..NP {
+            assert_eq!(world.get_prev_permutation(i), Some(i));
+            assert_eq!(world.get_next_permutation(i), Some(i));
+        }
+
+        // Create a 2-cycle
+        world.set_prev_permutation(0, Some(NP - 1));
+        world.set_next_permutation(0, Some(NP - 1));
+        world.set_prev_permutation(NP - 1, Some(0));
+        world.set_next_permutation(NP - 1, Some(0));
+        assert_eq!(world.get_prev_permutation(0), Some(NP - 1));
+        assert_eq!(world.get_worm_tail(), None);
+        assert_eq!(world.get_worm_head(), None);
+
+        // Break the cycle
+        world.set_prev_permutation(0, None);
+        world.set_next_permutation(NP - 1, None);
+        assert_eq!(world.get_worm_tail(), Some(0));
+        assert_eq!(world.get_worm_head(), Some(NP - 1));
     }
 
     #[test]
