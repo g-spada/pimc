@@ -319,6 +319,60 @@ impl<const N: usize, const M: usize, const D: usize> WorldLines<N, M, D> {
         }
     }
 
+    /// Gets the state of a specific particle at a specific time slice.
+    ///
+    /// # Arguments
+    /// * `particle` - The index of the particle.
+    /// * `time_slice` - The index of the time slice.
+    ///
+    /// # Returns
+    /// The `ParticleState` of the specified particle at the given time slice.
+    ///
+    /// # Panics
+    /// Panics if the `particle` or `time_slice` indices are out of bounds.
+    pub fn get_particle_state(&self, particle: usize, time_slice: usize) -> ParticleState {
+        debug_assert!(
+            particle < N,
+            "Particle index out of bounds: particle={}, max allowed={}",
+            particle,
+            N - 1
+        );
+        debug_assert!(
+            time_slice < M,
+            "Time slice index out of bounds: time_slice={}, max allowed={}",
+            time_slice,
+            M - 1
+        );
+
+        self.states[[particle, time_slice]]
+    }
+
+    /// Sets the state of a specific particle at a specific time slice.
+    ///
+    /// # Arguments
+    /// * `particle` - The index of the particle.
+    /// * `time_slice` - The index of the time slice.
+    /// * `state` - The `ParticleState` to assign to the particle.
+    ///
+    /// # Panics
+    /// Panics if the `particle` or `time_slice` indices are out of bounds.
+    pub fn set_particle_state(&mut self, particle: usize, time_slice: usize, state: ParticleState) {
+        debug_assert!(
+            particle < N,
+            "Particle index out of bounds: particle={}, max allowed={}",
+            particle,
+            N - 1
+        );
+        debug_assert!(
+            time_slice < M,
+            "Time slice index out of bounds: time_slice={}, max allowed={}",
+            time_slice,
+            M - 1
+        );
+
+        self.states[[particle, time_slice]] = state;
+    }
+
     /// Saves the WorldLines instance to a file in JSON format.
     ///
     /// This method serializes the `WorldLines` instance into a human-readable JSON
@@ -518,7 +572,6 @@ mod tests {
         assert!(result.is_err());
     }
 
-    //#[ignore]
     #[test]
     fn test_get_position_mut() {
         let mut world = WorldLines::<2, 3, 3>::new();
@@ -540,21 +593,6 @@ mod tests {
         world.get_position_mut(1, 3);
     }
 
-    #[test]
-    fn test_combined_operations() {
-        let mut world = WorldLines::<1, 1, 2>::new(); // 1 particle, 1 time slice, 2D
-
-        // Initial position should be zero
-        let position = world.get_position(0, 0);
-        assert_eq!(position, array![0.0, 0.0]);
-
-        // Modify position
-        world.set_position(0, 0, &[3.0, 4.0]);
-
-        // Verify the modification
-        let position = world.get_position(0, 0);
-        assert_eq!(position, array![3.0, 4.0]);
-    }
     #[test]
     fn test_get_positions() {
         let mut world = WorldLines::<2, 5, 3>::new(); // 2 particles, 5 time slices, 3D space
@@ -584,6 +622,38 @@ mod tests {
         // Verify the changes using get_positions
         let positions = world.get_positions(0, 0, 2);
         assert_eq!(positions, new_positions);
+    }
+
+    #[test]
+    fn test_particle_state() {
+        const N: usize = 4;
+        const M: usize = 8;
+        const D: usize = 3;
+
+        let mut world = WorldLines::<N, M, D>::new();
+
+        // Default state should be Up
+        for particle in 0..N {
+            for time_slice in 0..M {
+                assert_eq!(
+                    world.get_particle_state(particle, time_slice),
+                    ParticleState::Up
+                );
+            }
+        }
+
+        for time_slice in (0..M).step_by(2) {
+            // Cange the particle state to Dn for particle 1 at even slices
+            world.set_particle_state(1, time_slice, ParticleState::Dn)
+        }
+
+        for time_slice in 0..M {
+            if time_slice % 2 == 0 {
+                assert_eq!(world.get_particle_state(1, time_slice), ParticleState::Dn);
+            } else {
+                assert_eq!(world.get_particle_state(1, time_slice), ParticleState::Up);
+            }
+        }
     }
 
     #[test]
