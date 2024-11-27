@@ -47,11 +47,6 @@ impl<const N: usize, const M: usize, const D: usize> WorldLines<N, M, D> {
         }
     }
 
-    /// Create a new Default instance delegating to `new`
-    fn default() -> Self {
-        Self::new()
-    }
-
     /// Gets a view of the position of a specific particle at a specific time slice.
     ///
     /// # Arguments
