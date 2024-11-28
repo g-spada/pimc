@@ -26,7 +26,7 @@ use rand_distr::{Distribution, Normal};
 /// - If the number of slices in `polymer` is less than 2.
 ///
 /// # References
-/// - W. Krauth, "Algorithms and Computations," Algorithm 3.5, p.154 (with different normalization).
+/// - W. Krauth, "Statistical Mechanics: Algorithms and Computations", OUP Oxford, 2006, [<https://doi.org/10.1093/oso/9780198515357.001.0001>], Algorithm 3.5, p.154 (with different normalization).
 /// - Condens. Matter 2022, 7, 30, Eq. (27) [<http://arxiv.org/abs/2203.00010>]
 ///   *Note*: This reference contains a typo in the last denominator (extra π).
 ///
