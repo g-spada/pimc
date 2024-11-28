@@ -51,6 +51,7 @@ pub struct ProposedUpdate<T> {
     modified_particles: BTreeSet<usize>,
 }
 
+#[allow(clippy::new_without_default)]
 impl<T> ProposedUpdate<T> {
     /// Creates a new, empty `ProposedUpdate`.
     ///
