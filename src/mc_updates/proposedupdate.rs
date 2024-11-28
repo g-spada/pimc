@@ -1,6 +1,15 @@
 use std::collections::{BTreeSet, HashMap};
 use std::ops::Range;
 
+/// Represents a modification to a range of timeslices for a single particle.
+type Modification<T> = (Range<usize>, Vec<T>);
+
+/// A collection of modifications for a single particle.
+type ParticleModifications<T> = Vec<Modification<T>>;
+
+/// A map of particle indices to their respective modifications.
+type ModificationsMap<T> = HashMap<usize, ParticleModifications<T>>;
+
 /// A data structure to represent and manage proposed modifications
 /// to particle worldlines in a Monte Carlo simulation.
 ///
@@ -44,7 +53,7 @@ pub struct ProposedUpdate<T> {
     /// Each entry maps a particle index to a vector of:
     /// - `Range<usize>`: The range of modified timeslices for the particle.
     /// - `Vec<T>`: The new properties corresponding to the modified timeslices.
-    modifications: HashMap<usize, Vec<(Range<usize>, Vec<T>)>>,
+    modifications: ModificationsMap<T>,
     /// Cached set of all modified timeslices, stored in sorted order.
     modified_timeslices: BTreeSet<usize>,
     /// Cached set of all modified particle indices, stored in sorted order.
@@ -85,7 +94,7 @@ impl<T> ProposedUpdate<T> {
         // Update the modifications map
         self.modifications
             .entry(particle)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push((range.clone(), properties));
 
         // Update the cached modified particles and timeslices
