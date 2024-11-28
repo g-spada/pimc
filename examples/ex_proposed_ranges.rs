@@ -36,9 +36,9 @@ fn main() {
         [8.0, 9.0], // Row 7
     ];
 
-    // Add the first half (rows 0 to 3) for particle 1, range 0..4
+    // Add the first half (rows 0 to 3 included) for particle 1, range 3..7
     let first_half = positions2.slice(s![0..4, ..]).to_owned(); // Slice rows 0 to 3, all columns
-    updates.add_position_modification(1, 0..4, first_half);
+    updates.add_position_modification(1, 3..7, first_half);
 
     // Add the second half (rows 4 to 7) for particle 2, range 4..8
     let second_half = positions2.slice(s![4..8, ..]).to_owned(); // Slice rows 4 to 7, all columns
@@ -53,4 +53,28 @@ fn main() {
         "Particle 2 modifications: {:?}",
         updates.get_modifications(2)
     );
+
+    // Create another instance of ProposedUpdate instance
+    let mut updates2 = ProposedUpdate::new();
+
+    // Create a 4x2 array of positions
+    let positions2 = array![
+        [1.0, 2.0, -2.0], // Row 0
+        [3.0, 4.0, -4.0], // Row 1
+        [5.0, 6.0, -6.0], // Row 2
+        [7.0, 8.0, -6.0], // Row 3
+    ];
+
+    // Extract the first column
+    let first_column = positions2.slice(s![.., 0..1]).to_owned(); // Convert to an owned Array2
+
+    // Add the column as a modification
+    updates2.add_position_modification(1, 0..4, first_column);
+
+    // Verify the modification
+    if let Some(modifications) = updates2.get_modifications(1) {
+        for (range, pos) in modifications {
+            println!("Range: {:?}, Positions:\n{:?}", range, pos);
+        }
+    }
 }
