@@ -1,8 +1,9 @@
+use ndarray::Array2;
 use std::collections::{BTreeSet, HashMap};
 use std::ops::Range;
 
 /// Represents a modification to a range of timeslices for a single particle.
-type Modification<T> = (Range<usize>, Vec<T>);
+type Modification<T> = (Range<usize>, Array2<T>);
 
 /// A collection of modifications for a single particle.
 type ParticleModifications<T> = Vec<Modification<T>>;
@@ -10,130 +11,274 @@ type ParticleModifications<T> = Vec<Modification<T>>;
 /// A map of particle indices to their respective modifications.
 type ModificationsMap<T> = HashMap<usize, ParticleModifications<T>>;
 
-/// A data structure to represent and manage proposed modifications
-/// to particle worldlines in a Monte Carlo simulation.
+/// A data structure to represent and manage proposed modifications to
+/// particle worldlines in a Monte Carlo simulation.
 ///
-/// This structure stores modifications for a set of particles over
-/// ranges of timeslices. Each modification includes the indices of
-/// affected particles and their respective new properties (e.g., positions or states).
-/// The structure allows for efficient access to these modifications
-/// and provides precomputed lists of all modified particles and timeslices.
+/// This structure allows storing and managing modifications to particle positions
+/// over ranges of timeslices. Each modification is associated with a specific particle
+/// and includes the range of timeslices it affects along with the corresponding
+/// positions in an `Array2<T>`.
+///
+/// The structure tracks:
+/// - The list of all modified particles.
+/// - The union of all modified timeslices.
+/// - Modifications for each particle as a collection of `(Range<usize>, Array2<T>)`.
 ///
 /// # Type Parameters
-/// - `T`: The type of the properties being modified (e.g., `Vec<f64>` for positions).
-///
-/// # Efficiency
-/// - **Particle Modifications:** Stored in a `HashMap` for efficient lookup.
-/// - **Timeslices and Particles Union:** Cached in `BTreeSet` for sorted retrieval.
+/// - `T`: The type of the properties being modified (e.g., `f64` for positions).
 ///
 /// # Examples
+///
 /// ```
+/// use ndarray::array;
+/// use std::ops::Range;
 /// use pimc_rs::mc_updates::proposedupdate::ProposedUpdate;
-/// let mut modification = ProposedUpdate::new();
 ///
-/// // Add a modification for particle 0 over timeslices 1 to 4
-/// modification.add_modification(
-///     0,
-///     1..4,
-///     vec![[1.0, 2.0, 3.0], [1.1, 2.1, 3.1], [1.2, 2.2, 3.2]],
-/// );
+/// let mut updates = ProposedUpdate::new();
 ///
-/// // Retrieve all modified timeslices
-/// let timeslices = modification.get_modified_timeslices();
-/// assert_eq!(timeslices, vec![1, 2, 3]);
+/// // Add position modifications for particle 1
+/// let positions = array![[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]];
+/// updates.add_position_modification(1, 0..4, positions);
 ///
-/// // Retrieve modifications for a specific particle and timeslice
-/// if let Some(value) = modification.get_modification(0, 2) {
-///     println!("Modification for particle 0 at timeslice 2: {:?}", value);
-/// }
+/// // Check the modified particles and timeslices
+/// assert_eq!(updates.get_modified_particles(), vec![1]);
+/// assert_eq!(updates.get_modified_timeslices(), vec![0, 1, 2, 3]);
+///
+/// // Retrieve modifications for particle 1
+/// let modifications = updates.get_modifications(1).unwrap();
+/// assert_eq!(modifications.len(), 1);
 /// ```
+#[derive(Debug)]
 pub struct ProposedUpdate<T> {
-    /// Map of particle indices to their respective modifications.
-    ///
-    /// Each entry maps a particle index to a vector of:
-    /// - `Range<usize>`: The range of modified timeslices for the particle.
-    /// - `Vec<T>`: The new properties corresponding to the modified timeslices.
+    /// Maps particle indices to their respective modifications.
     modifications: ModificationsMap<T>,
+
     /// Cached set of all modified timeslices, stored in sorted order.
     modified_timeslices: BTreeSet<usize>,
+
     /// Cached set of all modified particle indices, stored in sorted order.
     modified_particles: BTreeSet<usize>,
 }
 
 #[allow(clippy::new_without_default)]
 impl<T> ProposedUpdate<T> {
-    /// Creates a new, empty `ProposedUpdate`.
+    /// Creates a new, empty `ProposedUpdate` instance.
     ///
     /// # Examples
     /// ```
     /// use pimc_rs::mc_updates::proposedupdate::ProposedUpdate;
-    /// let modification = ProposedUpdate::<Vec<f64>>::new();
-    /// assert!(modification.get_modified_particles().is_empty());
+    ///
+    /// let updates: ProposedUpdate<f64> = ProposedUpdate::new();
+    /// assert!(updates.get_modified_particles().is_empty());
+    /// assert!(updates.get_modified_timeslices().is_empty());
     /// ```
     pub fn new() -> Self {
-        Self {
+        ProposedUpdate {
             modifications: HashMap::new(),
             modified_timeslices: BTreeSet::new(),
             modified_particles: BTreeSet::new(),
         }
     }
 
-    /// Adds a modification for a specific particle over a range of timeslices.
+    /// Adds a position modification for a specific particle and timeslice range.
+    ///
+    /// This method updates the proposed positions for a particle over a specified range
+    /// of timeslices. Each particle can have multiple non-overlapping modifications.
+    /// Modifications with overlapping timeslice ranges for the same particle index are not allowed.
+    /// This behavior enforces strict separation of ranges to ensure modifications
+    /// are unambiguous and easily retrievable.
     ///
     /// # Parameters
-    /// - `particle`: The index of the particle being modified.
-    /// - `range`: The range of timeslices being modified (`start..end`).
-    /// - `properties`: A vector of new properties for the specified timeslices.
+    /// - `particle_index`: The index of the particle being modified.
+    /// - `range`: The range of timeslices affected by the modification.
+    /// - `positions`: A 2D array where each row corresponds to a timeslice in the range,
+    ///   and each column corresponds to a spatial coordinate.
     ///
     /// # Panics
-    /// Panics if the length of `properties` does not match the length of `range`.
-    pub fn add_modification(&mut self, particle: usize, range: Range<usize>, properties: Vec<T>) {
-        // Ensure the range and properties length match
-        assert_eq!(range.end - range.start, properties.len());
-
-        // Update the modifications map
-        self.modifications
-            .entry(particle)
-            .or_default()
-            .push((range.clone(), properties));
-
-        // Update the cached modified particles and timeslices
-        self.modified_particles.insert(particle);
-        self.modified_timeslices.extend(range);
-    }
-
-    /// Retrieves all modified timeslices as a sorted list.
+    /// - Panics if the number of rows in `positions` does not match the length of the `range`.
+    /// - Panics if the `range` overlaps with any existing range for the same `particle_index`.
     ///
-    /// # Returns
-    /// A vector containing all modified timeslices in ascending order.
-    pub fn get_modified_timeslices(&self) -> Vec<usize> {
-        self.modified_timeslices.iter().copied().collect()
-    }
-
-    /// Retrieves all modified particle indices as a sorted list.
+    /// # Examples
+    /// ```
+    /// use ndarray::array;
+    /// use pimc_rs::mc_updates::proposedupdate::ProposedUpdate;
     ///
-    /// # Returns
-    /// A vector containing all modified particle indices in ascending order.
-    pub fn get_modified_particles(&self) -> Vec<usize> {
-        self.modified_particles.iter().copied().collect()
+    /// let mut updates = ProposedUpdate::new();
+    /// let positions = array![[1.0, 2.0], [3.0, 4.0]];
+    ///
+    /// // Add a modification for particle 1 over the range 0..2
+    /// updates.add_position_modification(1, 0..2, positions);
+    /// assert_eq!(updates.get_modified_particles(), vec![1]);
+    /// assert_eq!(updates.get_modified_timeslices(), vec![0, 1]);
+    /// ```
+    pub fn add_position_modification<A>(
+        &mut self,
+        particle_index: usize,
+        range: Range<usize>,
+        positions: A,
+    ) where
+        A: Into<Array2<T>> + Clone,
+    {
+        let positions: Array2<T> = positions.into();
+
+        assert_eq!(
+            positions.nrows(),
+            range.len(),
+            "Number of rows in positions must match the range length"
+        );
+
+        // Check for overlapping ranges
+        if let Some(existing_modifications) = self.modifications.get(&particle_index) {
+            for (existing_range, _) in existing_modifications {
+                let no_overlap =
+                    range.start >= existing_range.end || range.end <= existing_range.start;
+                assert!(
+                    no_overlap,
+                    "Overlapping range detected for particle {}: {:?} overlaps with {:?}",
+                    particle_index, range, existing_range
+                );
+            }
+        }
+
+        // If no overlap, add the modification
+        self.modified_particles.insert(particle_index);
+        let entry = self.modifications.entry(particle_index).or_default();
+        entry.push((range.clone(), positions));
+
+        for timeslice in range {
+            self.modified_timeslices.insert(timeslice);
+        }
     }
 
-    /// Retrieves the modification for a specific particle and timeslice.
+    /// Retrieves all modifications for a given particle.
     ///
     /// # Parameters
-    /// - `particle`: The index of the particle being queried.
-    /// - `timeslice`: The timeslice being queried.
+    /// - `particle_index`: The index of the particle.
     ///
     /// # Returns
-    /// An `Option` containing a reference to the modified property, or `None` if no modification exists.
-    pub fn get_modification(&self, particle: usize, timeslice: usize) -> Option<&T> {
-        self.modifications.get(&particle).and_then(|ranges| {
-            for (range, properties) in ranges {
-                if range.contains(&timeslice) {
-                    return Some(&properties[timeslice - range.start]);
-                }
-            }
-            None
-        })
+    /// - `Some(&Vec<Modification<T>>)` if the particle has modifications.
+    /// - `None` if the particle has no modifications.
+    ///
+    /// # Examples
+    /// ```
+    /// use ndarray::array;
+    /// use pimc_rs::mc_updates::proposedupdate::ProposedUpdate;
+    ///
+    /// let mut updates = ProposedUpdate::new();
+    /// let positions = array![[1.0, 2.0], [3.0, 4.0]];
+    /// updates.add_position_modification(1, 0..2, positions);
+    ///
+    /// let modifications = updates.get_modifications(1).unwrap();
+    /// assert_eq!(modifications.len(), 1);
+    /// ```
+    pub fn get_modifications(&self, particle_index: usize) -> Option<&Vec<Modification<T>>> {
+        self.modifications.get(&particle_index)
+    }
+
+    /// Retrieves the list of all modified timeslices.
+    ///
+    /// # Returns
+    /// A vector containing all modified timeslices.
+    ///
+    /// # Examples
+    /// ```
+    /// use ndarray::array;
+    /// use pimc_rs::mc_updates::proposedupdate::ProposedUpdate;
+    ///
+    /// let mut updates = ProposedUpdate::new();
+    /// let positions = array![[1.0, 2.0], [3.0, 4.0]];
+    /// updates.add_position_modification(1, 0..2, positions);
+    ///
+    /// assert_eq!(updates.get_modified_timeslices(), vec![0, 1]);
+    /// ```
+    pub fn get_modified_timeslices(&self) -> Vec<usize> {
+        self.modified_timeslices.iter().cloned().collect()
+    }
+
+    /// Retrieves the list of all modified particle indices.
+    ///
+    /// # Returns
+    /// A vector containing all modified particle indices.
+    ///
+    /// # Examples
+    /// ```
+    /// use ndarray::array;
+    /// use pimc_rs::mc_updates::proposedupdate::ProposedUpdate;
+    ///
+    /// let mut updates = ProposedUpdate::new();
+    /// let positions = array![[1.0, 2.0], [3.0, 4.0]];
+    /// updates.add_position_modification(1, 0..2, positions);
+    ///
+    /// assert_eq!(updates.get_modified_particles(), vec![1]);
+    /// ```
+    pub fn get_modified_particles(&self) -> Vec<usize> {
+        self.modified_particles.iter().cloned().collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use ndarray::array;
+
+    #[test]
+    fn test_new() {
+        let updates: ProposedUpdate<f64> = ProposedUpdate::new();
+        assert!(updates.get_modified_particles().is_empty());
+        assert!(updates.get_modified_timeslices().is_empty());
+    }
+
+    #[test]
+    fn test_add_position_modification() {
+        let mut updates = ProposedUpdate::new();
+        let positions = array![[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]];
+        updates.add_position_modification(1, 0..3, positions);
+
+        let particles = updates.get_modified_particles();
+        assert_eq!(particles, vec![1]);
+
+        let timeslices = updates.get_modified_timeslices();
+        assert_eq!(timeslices, vec![0, 1, 2]);
+
+        let modifications = updates.get_modifications(1).unwrap();
+        assert_eq!(modifications.len(), 1);
+        assert_eq!(modifications[0].0, 0..3);
+    }
+
+    #[test]
+    fn test_multiple_modifications() {
+        let mut updates = ProposedUpdate::new();
+        let positions1 = array![[1.0, 2.0], [3.0, 4.0]];
+        let positions2 = array![[5.0, 6.0], [7.0, 8.0]];
+        updates.add_position_modification(1, 0..2, positions1);
+        updates.add_position_modification(2, 2..4, positions2);
+
+        let particles = updates.get_modified_particles();
+        assert_eq!(particles, vec![1, 2]);
+
+        let timeslices = updates.get_modified_timeslices();
+        assert_eq!(timeslices, vec![0, 1, 2, 3]);
+    }
+
+    #[test]
+    #[should_panic(expected = "Number of rows in positions must match the range length")]
+    fn test_invalid_position_modification() {
+        let mut updates = ProposedUpdate::new();
+        let positions = array![[1.0, 2.0]]; // Only 1 row
+        updates.add_position_modification(1, 0..2, positions); // Range length is 2
+    }
+
+    #[test]
+    #[should_panic(expected = "Overlapping range detected for particle 1: 4..8 overlaps with 2..5")]
+    fn test_overlapping_ranges_panic() {
+        let mut updates = ProposedUpdate::new();
+        let positions1 = array![[1.0, 2.0], [3.0, 4.0], [5.0, 6.0]];
+        let positions2 = array![[7.0, 8.0], [9.0, 10.0], [11.0, 12.0], [13.0, 14.0]];
+
+        // Add a modification for range 2..5
+        updates.add_position_modification(1, 2..5, positions1);
+
+        // Adding an overlapping modification for range 4..8 should panic
+        updates.add_position_modification(1, 4..8, positions2);
     }
 }

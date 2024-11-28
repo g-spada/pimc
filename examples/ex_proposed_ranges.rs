@@ -1,80 +1,56 @@
+use ndarray::{array, s};
 use pimc_rs::mc_updates::proposedupdate::ProposedUpdate;
-use pimc_rs::path_state::particlestate::ParticleState;
+
 fn main() {
-    //////////////////////////////////////////////////////
-    // Test the ProposedUpdate Struct for position updates
-    //////////////////////////////////////////////////////
-    let mut pos_update = ProposedUpdate::new();
+    let mut updates = ProposedUpdate::new();
 
-    // Add a modification for particle 0 over timeslices 1 to 4
-    pos_update.add_modification(
-        0,
-        1..4,
-        vec![[1.0, 2.0, 3.0], [1.1, 2.1, 3.1], [1.2, 2.2, 3.2]],
-    );
+    // Example: Add position modifications for particle 1
+    let positions = array![
+        [1.0, 2.0], // Position at timeslice 0
+        [2.0, 3.0], // Position at timeslice 1
+        [3.0, 4.0], // Position at timeslice 2
+    ];
+    updates.add_position_modification(1, 0..3, positions);
 
-    // Add another modification for particle 0 at timeslice 8
-    pos_update.add_modification(0, 8..9, vec![[8.0, -8.0, 8.0]]);
+    // Retrieve modified particles and timeslices
+    let particles = updates.get_modified_particles();
+    let timeslices = updates.get_modified_timeslices();
 
-    // Add another modification for particle 1
-    pos_update.add_modification(1, 3..5, vec![[2.0, 3.0, 4.0], [2.1, 3.1, 4.1]]);
-
-    // Add another modification for particle 5 at timeslice 3
-    pos_update.add_modification(5, 3..4, vec![[3.0, -4.0, 3.0]]);
-
-    // Get all modified timeslices
-    let timeslices = pos_update.get_modified_timeslices();
+    println!("Modified particles: {:?}", particles);
     println!("Modified timeslices: {:?}", timeslices);
 
-    // Get all modified particles
-    let particles = pos_update.get_modified_particles();
-    println!("Modified particles: {:?}", particles);
-
-    // Access a specific modification
-    if let Some(value) = pos_update.get_modification(0, 2) {
-        println!("Modification for particle 0 at timeslice 2: {:?}", value);
+    // Get position modifications for particle 1
+    if let Some(mods) = updates.get_modifications(1) {
+        println!("Position modifications for particle 1: {:?}", mods);
     }
 
-    //////////////////////////////////////////////////////
-    // Test the ProposedUpdate Struct for state updates
-    //////////////////////////////////////////////////////
-    let mut state_update = ProposedUpdate::new();
+    // Create an 8x2 array of positions
+    let positions2 = array![
+        [1.0, 2.0], // Row 0
+        [2.0, 3.0], // Row 1
+        [3.0, 4.0], // Row 2
+        [4.0, 5.0], // Row 3
+        [5.0, 6.0], // Row 4
+        [6.0, 7.0], // Row 5
+        [7.0, 8.0], // Row 6
+        [8.0, 9.0], // Row 7
+    ];
 
-    // Add a modification for particle 0 over timeslices 1 to 4
-    state_update.add_modification(
-        0,
-        1..4,
-        vec![ParticleState::Up, ParticleState::Up, ParticleState::Dn],
+    // Add the first half (rows 0 to 3) for particle 1, range 0..4
+    let first_half = positions2.slice(s![0..4, ..]).to_owned(); // Slice rows 0 to 3, all columns
+    updates.add_position_modification(1, 0..4, first_half);
+
+    // Add the second half (rows 4 to 7) for particle 2, range 4..8
+    let second_half = positions2.slice(s![4..8, ..]).to_owned(); // Slice rows 4 to 7, all columns
+    updates.add_position_modification(2, 4..8, second_half);
+
+    // Debug the stored modifications
+    println!(
+        "Particle 1 modifications: {:?}",
+        updates.get_modifications(1)
     );
-
-    // Add modifications for particle states
-    state_update.add_modification(
-        0,    // Particle index
-        1..4, // Timeslices
-        vec![
-            // Proposed states
-            ParticleState::Up,
-            ParticleState::Dn,
-            ParticleState::Up,
-        ],
+    println!(
+        "Particle 2 modifications: {:?}",
+        updates.get_modifications(2)
     );
-
-    state_update.add_modification(
-        1,    // Another particle index
-        2..5, // Timeslices
-        vec![ParticleState::Dn, ParticleState::Up, ParticleState::Dn],
-    );
-
-    // Retrieve and print all modified timeslices
-    let timeslices = state_update.get_modified_timeslices();
-    println!("Modified timeslices: {:?}", timeslices);
-
-    // Retrieve and print all modified particles
-    let particles = state_update.get_modified_particles();
-    println!("Modified particles: {:?}", particles);
-
-    // Access a specific modification
-    if let Some(state) = state_update.get_modification(0, 2) {
-        println!("Particle 0 at timeslice 2: {:?}", state);
-    }
 }
