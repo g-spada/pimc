@@ -32,7 +32,7 @@ use rand_distr::{Distribution, Normal};
 ///
 /// # Example
 /// ```rust
-/// use pimc_rs::mc_updates::redraw_staging::redraw_staging;
+/// use pimc_rs::updates::redraw_staging::redraw_staging;
 /// use ndarray::Array2;
 /// use rand::thread_rng;
 ///

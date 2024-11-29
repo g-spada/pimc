@@ -32,7 +32,7 @@ type ModificationsMap<T> = HashMap<usize, ParticleModifications<T>>;
 /// ```
 /// use ndarray::array;
 /// use std::ops::Range;
-/// use pimc_rs::mc_updates::proposedupdate::ProposedUpdate;
+/// use pimc_rs::updates::proposedupdate::ProposedUpdate;
 ///
 /// let mut updates = ProposedUpdate::new();
 ///
@@ -66,7 +66,7 @@ impl<T> ProposedUpdate<T> {
     ///
     /// # Examples
     /// ```
-    /// use pimc_rs::mc_updates::proposedupdate::ProposedUpdate;
+    /// use pimc_rs::updates::proposedupdate::ProposedUpdate;
     ///
     /// let updates: ProposedUpdate<f64> = ProposedUpdate::new();
     /// assert!(updates.get_modified_particles().is_empty());
@@ -101,7 +101,7 @@ impl<T> ProposedUpdate<T> {
     /// # Examples
     /// ```
     /// use ndarray::array;
-    /// use pimc_rs::mc_updates::proposedupdate::ProposedUpdate;
+    /// use pimc_rs::updates::proposedupdate::ProposedUpdate;
     ///
     /// let mut updates = ProposedUpdate::new();
     /// let positions = array![[1.0, 2.0], [3.0, 4.0]];
@@ -162,7 +162,7 @@ impl<T> ProposedUpdate<T> {
     /// # Examples
     /// ```
     /// use ndarray::array;
-    /// use pimc_rs::mc_updates::proposedupdate::ProposedUpdate;
+    /// use pimc_rs::updates::proposedupdate::ProposedUpdate;
     ///
     /// let mut updates = ProposedUpdate::new();
     /// let positions = array![[1.0, 2.0], [3.0, 4.0]];
@@ -183,7 +183,7 @@ impl<T> ProposedUpdate<T> {
     /// # Examples
     /// ```
     /// use ndarray::array;
-    /// use pimc_rs::mc_updates::proposedupdate::ProposedUpdate;
+    /// use pimc_rs::updates::proposedupdate::ProposedUpdate;
     ///
     /// let mut updates = ProposedUpdate::new();
     /// let positions = array![[1.0, 2.0], [3.0, 4.0]];
@@ -203,7 +203,7 @@ impl<T> ProposedUpdate<T> {
     /// # Examples
     /// ```
     /// use ndarray::array;
-    /// use pimc_rs::mc_updates::proposedupdate::ProposedUpdate;
+    /// use pimc_rs::updates::proposedupdate::ProposedUpdate;
     ///
     /// let mut updates = ProposedUpdate::new();
     /// let positions = array![[1.0, 2.0], [3.0, 4.0]];

@@ -1,4 +1,4 @@
-pub mod mc_updates;
+pub mod updates;
 pub mod path_state;
 
 pub fn greet() {
