@@ -1,4 +1,6 @@
-pub trait MonteCarloUpdate<W> {
+use super::proposed_update::ProposedUpdate;
+
+pub trait MonteCarloUpdate<W, T> {
     /// Apply a Monte Carlo update to the given worldlines.
     ///
     /// # Arguments
@@ -8,8 +10,12 @@ pub trait MonteCarloUpdate<W> {
     ///
     /// # Returns
     /// `true` if the update was accepted, `false` otherwise.
-    fn try_update<F>(&self, worldlines: &mut W, weight_function: F, rng: &mut impl rand::Rng) -> bool
+    fn try_update<F>(
+        &self,
+        worldlines: &mut W,
+        weight_function: F,
+        rng: &mut impl rand::Rng,
+    ) -> bool
     where
-        F: Fn(&W) -> f64;
+        F: Fn(&W, &ProposedUpdate<T>) -> f64;
 }
-

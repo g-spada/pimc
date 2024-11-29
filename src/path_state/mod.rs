@@ -1,5 +1,6 @@
 pub mod particlestate;
-pub mod worldlineaccess;
+pub mod sector;
+pub mod traits;
 pub mod worldlines;
 
-//pub use worldlines::WorldLines;
+pub use traits::WorldLineBase;
