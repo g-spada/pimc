@@ -98,7 +98,7 @@ where
         }
 
         let acceptance_ratio = weight_function(worldlines, &proposal);
-        trace!("Acceptance ratio {:}", displacements);
+        trace!("Acceptance ratio {:}", acceptance_ratio);
 
         // Apply Metropolis-Hastings acceptance criterion
         if rng.gen::<f64>() < acceptance_ratio {
