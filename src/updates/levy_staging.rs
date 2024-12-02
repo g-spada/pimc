@@ -26,13 +26,14 @@ use rand_distr::{Distribution, Normal};
 /// - If the number of slices in `polymer` is less than 2.
 ///
 /// # References
-/// - W. Krauth, "Statistical Mechanics: Algorithms and Computations", OUP Oxford, 2006, [<https://doi.org/10.1093/oso/9780198515357.001.0001>], Algorithm 3.5, p.154 (with different normalization).
+/// - W. Krauth, "Statistical Mechanics: Algorithms and Computations", OUP Oxford, 2006, 
+///   [<https://doi.org/10.1093/oso/9780198515357.001.0001>], Algorithm 3.5, p.154 (with different normalization).
 /// - Condens. Matter 2022, 7, 30, Eq. (27) [<http://arxiv.org/abs/2203.00010>]
 ///   *Note*: This reference contains a typo in the last denominator (extra π).
 ///
 /// # Example
 /// ```rust
-/// use pimc_rs::updates::redraw_staging::redraw_staging;
+/// use pimc_rs::updates::levy_staging::levy_staging;
 /// use ndarray::Array2;
 /// use rand::thread_rng;
 ///
@@ -42,7 +43,7 @@ use rand_distr::{Distribution, Normal};
 /// let mut rng = thread_rng();
 ///
 /// // Modify the intermediate slice using Levy's staging algorithm
-/// redraw_staging(&mut polymer, two_lambda_tau, &mut rng);
+/// levy_staging(&mut polymer, two_lambda_tau, &mut rng);
 ///
 /// // Check that the first and last slices are unchanged
 /// assert_eq!(polymer.row(0).to_vec(), vec![0.0, 0.0]);
@@ -51,7 +52,7 @@ use rand_distr::{Distribution, Normal};
 /// // Intermediate slice should be modified
 /// assert_ne!(polymer.row(1).to_vec(), vec![1.0, 1.0]);
 /// ```
-pub fn redraw_staging<S, R: Rng>(polymer: &mut ArrayBase<S, Ix2>, two_lambda_tau: f64, rng: &mut R)
+pub fn levy_staging<S, R: Rng>(polymer: &mut ArrayBase<S, Ix2>, two_lambda_tau: f64, rng: &mut R)
 where
     S: DataMut<Elem = f64>,
 {
@@ -89,14 +90,14 @@ mod tests {
     use rand::thread_rng;
 
     #[test]
-    fn test_redraw_staging_basic() {
+    fn test_levy_staging_basic() {
         let mut polymer =
             Array2::from_shape_vec((3, 2), vec![0.0, 0.0, 1.0, 1.0, 2.0, 2.0]).unwrap();
         let two_lambda_tau = 1.0;
         let mut rng = thread_rng();
 
         // Modify the intermediate slice
-        redraw_staging(&mut polymer, two_lambda_tau, &mut rng);
+        levy_staging(&mut polymer, two_lambda_tau, &mut rng);
 
         // First and last slices should remain unchanged
         assert_eq!(polymer.row(0).to_vec(), vec![0.0, 0.0]);
@@ -107,7 +108,7 @@ mod tests {
     }
 
     #[test]
-    fn test_redraw_staging_deterministic() {
+    fn test_levy_staging_deterministic() {
         let mut polymer = Array2::from_shape_vec(
             (5, 2),
             vec![0.0, 0.0, 1.0, 1.0, 2.0, 2.0, 3.0, 3.0, -8.0, 8.0],
@@ -119,7 +120,7 @@ mod tests {
         let mut rng = thread_rng();
 
         // Modify the intermediate slice
-        redraw_staging(&mut polymer, two_lambda_tau, &mut rng);
+        levy_staging(&mut polymer, two_lambda_tau, &mut rng);
 
         // First and last slices should remain unchanged
         assert_eq!(polymer.row(0).to_vec(), vec![0.0, 0.0]);
@@ -133,28 +134,28 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn test_redraw_staging_invalid_two_lambda_tau() {
+    fn test_levy_staging_invalid_two_lambda_tau() {
         let mut polymer = Array2::zeros((3, 2));
         let two_lambda_tau = -1.0; // Invalid value
         let mut rng = thread_rng();
 
         // This should panic
-        redraw_staging(&mut polymer, two_lambda_tau, &mut rng);
+        levy_staging(&mut polymer, two_lambda_tau, &mut rng);
     }
 
     #[test]
     #[should_panic(expected = "The polymer must have at lesat 2 slices")]
-    fn test_redraw_staging_insufficient_slices() {
+    fn test_levy_staging_insufficient_slices() {
         let mut polymer = Array2::zeros((1, 2)); // Only one slice
         let two_lambda_tau = 1.0;
         let mut rng = thread_rng();
 
         // This should panic
-        redraw_staging(&mut polymer, two_lambda_tau, &mut rng);
+        levy_staging(&mut polymer, two_lambda_tau, &mut rng);
     }
 
     #[test]
-    fn test_redraw_staging_multi_dimension() {
+    fn test_levy_staging_multi_dimension() {
         let mut polymer = Array2::from_shape_vec(
             (4, 3),
             vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 3.0, 3.0, 3.0],
@@ -164,7 +165,7 @@ mod tests {
         let mut rng = thread_rng();
 
         // Modify intermediate slices
-        redraw_staging(&mut polymer, two_lambda_tau, &mut rng);
+        levy_staging(&mut polymer, two_lambda_tau, &mut rng);
 
         // Ensure boundary slices are unchanged
         assert_eq!(polymer.row(0).to_vec(), vec![0.0, 0.0, 0.0]);
@@ -176,7 +177,7 @@ mod tests {
     }
 
     #[test]
-    fn test_redraw_staging_first_column() {
+    fn test_levy_staging_first_column() {
         use ndarray::s;
 
         let mut polymer = Array2::from_shape_vec(
@@ -195,7 +196,7 @@ mod tests {
         // Extract only the first column as a mutable view
         {
             let mut first_column = polymer.slice_mut(s![.., 0..1]);
-            redraw_staging(&mut first_column, two_lambda_tau, &mut rng);
+            levy_staging(&mut first_column, two_lambda_tau, &mut rng);
         }
 
         // Ensure boundary slices (first and last rows) are unchanged
