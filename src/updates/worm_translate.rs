@@ -2,15 +2,16 @@ use super::monte_carlo_update::MonteCarloUpdate;
 use super::proposed_update::ProposedUpdate;
 use crate::path_state::sector::Sector;
 use crate::path_state::traits::WorldLineWithPermutations;
+use crate::path_state::traits::WorldLineWormAccess;
 use ndarray::{Array1, Array2, Axis};
 
-/// A simple mock Monte Carlo update for testing.
-pub struct Translate {
+/// A Monte Carlo update that translates open and closed polymers.
+pub struct WormTranslate {
     max_displacement: Vec<f64>,
 }
 
-impl Translate {
-    /// Initializes `Translate` with the specified maximum displacements.
+impl WormTranslate {
+    /// Initializes `WormTranslate` with the specified maximum displacements.
     ///
     /// # Arguments
     /// * `max_displacement` - A vector specifying the maximum displacement for each dimension.
@@ -19,9 +20,9 @@ impl Translate {
     }
 }
 
-impl<W> MonteCarloUpdate<W, f64> for Translate
+impl<W> MonteCarloUpdate<W, f64> for WormTranslate
 where
-    W: WorldLineWithPermutations, // Ensure W implements WorldLineAccess with the given State type
+    W: WorldLineWithPermutations + WorldLineWormAccess, // Ensure W implements WorldLineAccess with the given State type
 {
     fn try_update<F>(
         &self,
@@ -35,7 +36,7 @@ where
         let mut proposal = ProposedUpdate::new();
         // Randomly select an initial particle index
         let mut p0: usize = rng.gen_range(0..worldlines.particles());
-        if worldlines.sector() == Sector::G {
+        if *worldlines.sector() == Sector::G {
             // Navigate the polymer to detect if current polymer is closed.
             // We keep p0 if polymer is closed, or we set `p0 = tail` if polymer is open.
             let mut p = p0;
