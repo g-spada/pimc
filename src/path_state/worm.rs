@@ -14,7 +14,6 @@ use std::io::{self, BufReader, BufWriter};
 /// # Example
 /// ```
 /// use pimc_rs::path_state::worm::Worm;
-/// use crate::pimc_rs::path_state::traits::WorldLinePositionAccess;
 ///
 /// // Create a new Worm instance
 /// let mut world = Worm::<2,3,3>::new(); // 2 particles, 3 time slices, 3D space
@@ -36,7 +35,7 @@ pub struct Worm<const N: usize, const M: usize, const D: usize> {
     next_permutation: Array1<i32>, // -1 for open worldlines
     worm_head: Option<usize>,
     worm_tail: Option<usize>,
-    sector: Sector,
+    //sector: Sector,
 }
 
 #[allow(clippy::new_without_default)]
@@ -49,7 +48,7 @@ impl<const N: usize, const M: usize, const D: usize> Worm<N, M, D> {
             next_permutation: Array1::from_iter((0..N).map(|i| i as i32)),
             worm_head: None,
             worm_tail: None,
-            sector: Sector::Z,
+            //sector: Sector::Z,
         }
     }
 
@@ -66,7 +65,6 @@ impl<const N: usize, const M: usize, const D: usize> Worm<N, M, D> {
     /// ```
     /// use pimc_rs::path_state::worm::Worm;
     /// use ndarray::array;
-    /// use crate::pimc_rs::path_state::traits::WorldLinePositionAccess;
     ///
     /// let mut world = Worm::<2, 3, 3>::new();
     ///
@@ -128,26 +126,22 @@ impl<const N: usize, const M: usize, const D: usize> Worm<N, M, D> {
         let world_lines = serde_json::from_reader(reader)?;
         Ok(world_lines)
     }
-}
 
-impl<const N: usize, const M: usize, const D: usize> WorldLineDimensions for Worm<N, M, D> {
     /// Returns the number of particles in the system.
-    fn particles(&self) -> usize {
+    pub fn particles(&self) -> usize {
         N
     }
 
     /// Returns the number of time slices in the system.
-    fn time_slices(&self) -> usize {
+    pub fn time_slices(&self) -> usize {
         M
     }
 
     /// Returns the number of spatial dimensions.
-    fn spatial_dimensions(&self) -> usize {
+    pub fn spatial_dimensions(&self) -> usize {
         D
     }
-}
 
-impl<const N: usize, const M: usize, const D: usize> WorldLinePositionAccess for Worm<N, M, D> {
     /// Gets a view of the position of a specific particle at a specific time slice.
     ///
     /// # Arguments
@@ -159,7 +153,7 @@ impl<const N: usize, const M: usize, const D: usize> WorldLinePositionAccess for
     ///
     /// # Panics
     /// Panics if the particle or time_slice indices are out of bounds.
-    fn position(&self, particle: usize, time_slice: usize) -> ArrayView1<f64> {
+    pub fn position(&self, particle: usize, time_slice: usize) -> ArrayView1<f64> {
         // Ensure indices are within bounds
         debug_assert!(
             particle < N,
@@ -188,7 +182,7 @@ impl<const N: usize, const M: usize, const D: usize> WorldLinePositionAccess for
     ///
     /// # Panics
     /// Panics if the particle or time_slice indices are out of bounds.
-    fn position_mut(&mut self, particle: usize, time_slice: usize) -> ArrayViewMut1<f64> {
+    pub fn position_mut(&mut self, particle: usize, time_slice: usize) -> ArrayViewMut1<f64> {
         // Ensure indices are within bounds
         debug_assert!(
             particle < N,
@@ -216,7 +210,7 @@ impl<const N: usize, const M: usize, const D: usize> WorldLinePositionAccess for
     /// # Panics
     /// Panics if the particle or time_slice indices are out of bounds, or if the length of `bead_position`
     /// does not match the spatial dimension `d`.
-    fn set_position(&mut self, particle: usize, time_slice: usize, bead_position: &[f64]) {
+    pub fn set_position(&mut self, particle: usize, time_slice: usize, bead_position: &[f64]) {
         // Ensure indices are within bounds
         debug_assert!(
             particle < N,
@@ -266,7 +260,6 @@ impl<const N: usize, const M: usize, const D: usize> WorldLinePositionAccess for
     /// ```
     /// use pimc_rs::path_state::worm::Worm;
     /// use ndarray::array;
-    /// use crate::pimc_rs::path_state::traits::WorldLinePositionAccess;
     ///
     /// let mut world = Worm::<2,5,3>::new(); // 2 particles, 5 time slices, 3D space
     /// world.set_position(0, 0, &[1.0, 2.0, 3.0]);
@@ -276,7 +269,7 @@ impl<const N: usize, const M: usize, const D: usize> WorldLinePositionAccess for
     /// let positions = world.positions(0, 0, 2);
     /// assert_eq!(positions, array![[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]);
     /// ```
-    fn positions(&self, particle: usize, start_slice: usize, end_slice: usize) -> ArrayView2<f64> {
+    pub fn positions(&self, particle: usize, start_slice: usize, end_slice: usize) -> ArrayView2<f64> {
         debug_assert!(
             particle < N,
             "Particle index out of bounds: particle={}, max allowed={}",
@@ -319,7 +312,6 @@ impl<const N: usize, const M: usize, const D: usize> WorldLinePositionAccess for
     /// ```
     /// use pimc_rs::path_state::worm::Worm;
     /// use ndarray::array;
-    /// use crate::pimc_rs::path_state::traits::WorldLinePositionAccess;
     ///
     /// let mut world = Worm::<2,5,3>::new(); // 2 particles, 5 time slices, 3D space
     ///
@@ -331,7 +323,7 @@ impl<const N: usize, const M: usize, const D: usize> WorldLinePositionAccess for
     /// let positions = world.positions(0, 0, 2);
     /// assert_eq!(positions, new_positions);
     /// ```
-    fn set_positions(
+    pub fn set_positions(
         &mut self,
         particle: usize,
         start_slice: usize,
@@ -370,16 +362,14 @@ impl<const N: usize, const M: usize, const D: usize> WorldLinePositionAccess for
             .slice_mut(s![particle, start_slice..end_slice, ..])
             .assign(positions);
     }
-}
 
-impl<const N: usize, const M: usize, const D: usize> WorldLinePermutationAccess for Worm<N, M, D> {
     /// Gets the previous particle for a given particle.
     ///
     /// # Returns
     /// An `Option<usize>` where:
     /// * `Some(value)` indicates the preceding particle index.
     /// * `None` indicates an open worldline (-1).
-    fn preceding(&self, particle: usize) -> Option<usize> {
+    pub fn preceding(&self, particle: usize) -> Option<usize> {
         debug_assert!(
             particle < N,
             "Particle index out of bounds: particle={}, max allowed={}",
@@ -400,7 +390,7 @@ impl<const N: usize, const M: usize, const D: usize> WorldLinePermutationAccess 
     ///
     /// # Panics
     /// Panics if `particle` is out of bounds or if `prev_particle` is `Some(value)` and `value` is not in the valid range `0..N`.
-    fn set_preceding(&mut self, particle: usize, prev_particle: Option<usize>) {
+    pub fn set_preceding(&mut self, particle: usize, prev_particle: Option<usize>) {
         debug_assert!(
             particle < N,
             "Particle index out of bounds: particle={}, max allowed={}",
@@ -437,7 +427,7 @@ impl<const N: usize, const M: usize, const D: usize> WorldLinePermutationAccess 
     /// An `Option<usize>` where:
     /// * `Some(value)` indicates the following particle index.
     /// * `None` indicates an open worldline (-1).
-    fn following(&self, particle: usize) -> Option<usize> {
+    pub fn following(&self, particle: usize) -> Option<usize> {
         debug_assert!(
             particle < N,
             "Particle index out of bounds: particle={}, max allowed={}",
@@ -458,7 +448,7 @@ impl<const N: usize, const M: usize, const D: usize> WorldLinePermutationAccess 
     ///
     /// # Panics
     /// Panics if `particle` is out of bounds or if `next_particle` is `Some(value)` and `value` is not in the valid range `0..N`.
-    fn set_following(&mut self, particle: usize, next_particle: Option<usize>) {
+    pub fn set_following(&mut self, particle: usize, next_particle: Option<usize>) {
         debug_assert!(
             particle < N,
             "Particle index out of bounds: particle={}, max allowed={}",
@@ -488,15 +478,20 @@ impl<const N: usize, const M: usize, const D: usize> WorldLinePermutationAccess 
             }
         }
     }
-}
 
-impl<const N: usize, const M: usize, const D: usize> WorldLineWormAccess for Worm<N, M, D> {
     /// Gets the sector for a given particle.
     ///
     /// # Returns
     /// A reference to the `Sector` of the worldline.
-    fn sector(&self) -> &Sector {
-        &self.sector
+    pub fn sector(&self) -> Sector {
+        if self.worm_tail.is_some() {
+            debug_assert!( self.worm_head.is_some(), "Headless worm!" );
+            Sector::G
+        }
+        else {
+            debug_assert!( self.worm_head.is_none(), "Tailless worm!" );
+            Sector::Z
+        }
     }
 
     /// Gets the worm head particle index, if it exists.
@@ -505,7 +500,7 @@ impl<const N: usize, const M: usize, const D: usize> WorldLineWormAccess for Wor
     /// An `Option<usize>`:
     /// * `Some(index)` - The index of the particle acting as the worm head.
     /// * `None` - If there is no worm head in the current configuration.
-    fn worm_head(&self) -> Option<usize> {
+    pub fn worm_head(&self) -> Option<usize> {
         self.worm_head
     }
 
@@ -515,8 +510,97 @@ impl<const N: usize, const M: usize, const D: usize> WorldLineWormAccess for Wor
     /// An `Option<usize>`:
     /// * `Some(index)` - The index of the particle acting as the worm head.
     /// * `None` - If there is no worm head in the current configuration.
-    fn worm_tail(&self) -> Option<usize> {
+    pub fn worm_tail(&self) -> Option<usize> {
         self.worm_tail
+    }
+}
+
+impl<const N: usize, const M: usize, const D: usize> WorldLineDimensions for Worm<N, M, D> {
+    /// Returns the number of particles in the system.
+    fn particles(&self) -> usize {
+        self.particles()
+    }
+
+    /// Returns the number of time slices in the system.
+    fn time_slices(&self) -> usize {
+        self.time_slices()
+    }
+
+    /// Returns the number of spatial dimensions.
+    fn spatial_dimensions(&self) -> usize {
+        self.spatial_dimensions()
+    }
+}
+
+impl<const N: usize, const M: usize, const D: usize> WorldLinePositionAccess for Worm<N, M, D> {
+    /// Gets a view of the position of a specific particle at a specific time slice.
+    fn position(&self, particle: usize, time_slice: usize) -> ArrayView1<f64> {
+        self.position(particle, time_slice)
+    }
+
+    /// Gets a mutable view of the position of a specific particle at a specific time slice.
+    fn position_mut(&mut self, particle: usize, time_slice: usize) -> ArrayViewMut1<f64> {
+        self.position_mut(particle, time_slice)
+    }
+
+    /// Sets the position of a specific particle at a specific time slice.
+    fn set_position(&mut self, particle: usize, time_slice: usize, bead_position: &[f64]) {
+        self.set_position(particle, time_slice, bead_position)
+    }
+
+    /// Gets a view of the positions for a specific particle across a range of time slices.
+    fn positions(&self, particle: usize, start_slice: usize, end_slice: usize) -> ArrayView2<f64> {
+        self.positions(particle, start_slice, end_slice)
+    }
+
+    /// Sets the positions for a specific particle across a range of time slices.
+    fn set_positions(
+        &mut self,
+        particle: usize,
+        start_slice: usize,
+        end_slice: usize,
+        positions: &Array2<f64>,
+    ) {
+        self.set_positions(particle, start_slice, end_slice, positions)
+    }
+}
+
+impl<const N: usize, const M: usize, const D: usize> WorldLinePermutationAccess for Worm<N, M, D> {
+    /// Gets the index of the preceding particle in the polymer.
+    fn preceding(&self, particle: usize) -> Option<usize> {
+        self.preceding(particle)
+    }
+
+    ///// Sets the index of the preceding particle in the polymer.
+    //fn set_preceding(&mut self, particle: usize, preceding: Option<usize>) {
+        //self.set_preceding(particle, preceding)
+    //}
+
+    /// Gets the index of the following particle in the polymer.
+    fn following(&self, particle: usize) -> Option<usize> {
+        self.following(particle)
+    }
+
+    ///// Sets the index of the following particle in the polymer.
+    //fn set_following(&mut self, particle: usize, following: Option<usize>) {
+        //self.set_following(particle, following)
+    //}
+}
+
+impl<const N: usize, const M: usize, const D: usize> WorldLineWormAccess for Worm<N, M, D> {
+    /// Gets the index of the worm head, if it exists.
+    fn worm_head(&self) -> Option<usize> {
+        self.worm_head()
+    }
+
+    /// Gets the index of the worm tail, if it exists.
+    fn worm_tail(&self) -> Option<usize> {
+        self.worm_tail()
+    }
+
+    /// Gets the sector of the worldlines.
+    fn sector(&self) -> Sector {
+        self.sector()
     }
 }
 

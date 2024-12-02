@@ -5,6 +5,7 @@ edition = "2021"
 license = "MIT"
 
 [dependencies]
+log = "0.4.22"
 ndarray = { version = "0.16.1", features = ["serde"] }
 rand = "0.8.5"
 rand_distr = "0.4.3"

@@ -42,14 +42,14 @@ pub trait WorldLinePermutationAccess {
     /// Gets the index of the preceding particle in the polymer.
     fn preceding(&self, particle: usize) -> Option<usize>;
 
-    /// Sets the index of the preceding particle in the polymer.
-    fn set_preceding(&mut self, particle: usize, preceding: Option<usize>);
+    ///// Sets the index of the preceding particle in the polymer.
+    //fn set_preceding(&mut self, particle: usize, preceding: Option<usize>);
 
     /// Gets the index of the following particle in the polymer.
     fn following(&self, particle: usize) -> Option<usize>;
 
-    /// Sets the index of the following particle in the polymer.
-    fn set_following(&mut self, particle: usize, following: Option<usize>);
+    ///// Sets the index of the following particle in the polymer.
+    //fn set_following(&mut self, particle: usize, following: Option<usize>);
 }
 
 /// Trait for accessing the permutation structure of worldlines.
@@ -61,7 +61,7 @@ pub trait WorldLineWormAccess {
     fn worm_tail(&self) -> Option<usize>;
 
     /// Gets the sector of the worldlines.
-    fn sector(&self) -> &Sector;
+    fn sector(&self) -> Sector;
 }
 
 /// Trait for accessing and modifying particle internal quantum states of the worldlines.
@@ -76,5 +76,5 @@ pub trait WorldLineStateAccess {
     fn set_state(&mut self, particle: usize, time_slice: usize, state: Self::State);
 }
 
-pub trait WorldLineBase: WorldLineDimensions + WorldLinePositionAccess {}
-pub trait WorldLineWithPermutations: WorldLineBase + WorldLinePermutationAccess {}
+//pub trait WorldLineBase: WorldLineDimensions + WorldLinePositionAccess {}
+//pub trait WorldLineWithPermutations: WorldLineBase + WorldLinePermutationAccess {}

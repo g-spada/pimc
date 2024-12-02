@@ -1,13 +1,17 @@
 use super::monte_carlo_update::MonteCarloUpdate;
 use super::proposed_update::ProposedUpdate;
 use crate::path_state::sector::Sector;
-use crate::path_state::traits::WorldLineWithPermutations;
-use crate::path_state::traits::WorldLineWormAccess;
+use crate::path_state::traits::{
+    WorldLineDimensions, WorldLinePermutationAccess, WorldLinePositionAccess, WorldLineWormAccess,
+};
+use log::trace;
 use ndarray::{Array1, Array2, Axis};
 
 /// A Monte Carlo update that translates open and closed polymers.
 pub struct WormTranslate {
     max_displacement: Vec<f64>,
+    accept_count: usize,
+    reject_count: usize,
 }
 
 impl WormTranslate {
@@ -16,16 +20,23 @@ impl WormTranslate {
     /// # Arguments
     /// * `max_displacement` - A vector specifying the maximum displacement for each dimension.
     pub fn new(max_displacement: Vec<f64>) -> Self {
-        Self { max_displacement }
+        Self {
+            max_displacement,
+            accept_count: 0,
+            reject_count: 0,
+        }
     }
 }
 
 impl<W> MonteCarloUpdate<W, f64> for WormTranslate
 where
-    W: WorldLineWithPermutations + WorldLineWormAccess, // Ensure W implements WorldLineAccess with the given State type
+    W: WorldLineDimensions
+        + WorldLinePositionAccess
+        + WorldLinePermutationAccess
+        + WorldLineWormAccess,
 {
     fn try_update<F>(
-        &self,
+        &mut self,
         worldlines: &mut W,
         weight_function: F,
         rng: &mut impl rand::Rng,
@@ -36,20 +47,27 @@ where
         let mut proposal = ProposedUpdate::new();
         // Randomly select an initial particle index
         let mut p0: usize = rng.gen_range(0..worldlines.particles());
-        if *worldlines.sector() == Sector::G {
+        trace!("Selected particle {}", p0);
+        if worldlines.sector() == Sector::G {
             // Navigate the polymer to detect if current polymer is closed.
             // We keep p0 if polymer is closed, or we set `p0 = tail` if polymer is open.
             let mut p = p0;
             p0 = loop {
-                if let Some(next) = worldlines.preceding(p) {
-                    if next == p0 {
+                if let Some(prev) = worldlines.preceding(p) {
+                    if prev == p0 {
                         break p0; // Cycle detected, return the start value
                     }
-                    p = next;
+                    p = prev;
                 } else {
+                    debug_assert_eq!(
+                        Some(p),
+                        worldlines.worm_tail(),
+                        "We should have reached the tail"
+                    );
                     break p; // End reached, return the last valid value
                 }
             };
+            trace!("Moving polymer starting from {}", p0);
         }
         let d = worldlines.spatial_dimensions();
         let t = worldlines.time_slices();
@@ -57,6 +75,7 @@ where
         let displacements = Array1::from_iter((0..d).map(|_| {
             rng.gen_range(-1.0..=1.0) * self.max_displacement[d % self.max_displacement.len()]
         }));
+        trace!("Displacement vector {:}", displacements);
 
         // Apply the displacement to the whole polymer
         let mut p = p0;
@@ -65,7 +84,7 @@ where
             new_positions
                 .axis_iter_mut(Axis(0))
                 .for_each(|mut slice| slice += &displacements);
-            proposal.add_position_modification(p0, 0..t, new_positions);
+            proposal.add_position_modification(p, 0..t, new_positions);
             if let Some(next) = worldlines.following(p) {
                 if next == p0 {
                     // End of the cycle.
@@ -78,7 +97,8 @@ where
             }
         }
 
-        let acceptance_ratio = weight_function(&worldlines, &proposal);
+        let acceptance_ratio = weight_function(worldlines, &proposal);
+        trace!("Acceptance ratio {:}", displacements);
 
         // Apply Metropolis-Hastings acceptance criterion
         if rng.gen::<f64>() < acceptance_ratio {
@@ -86,13 +106,15 @@ where
             for particle in proposal.get_modified_particles() {
                 if let Some(modifications) = proposal.get_modifications(particle) {
                     for (range, new_positions) in modifications {
-                        worldlines.set_positions(particle, range.start, range.end, &new_positions);
+                        worldlines.set_positions(particle, range.start, range.end, new_positions);
                     }
                 }
             }
+            self.accept_count += 1;
             true
         } else {
             // Reject the update
+            self.reject_count += 1;
             false
         }
     }

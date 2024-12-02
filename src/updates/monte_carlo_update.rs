@@ -11,7 +11,7 @@ pub trait MonteCarloUpdate<W, T> {
     /// # Returns
     /// `true` if the update was accepted, `false` otherwise.
     fn try_update<F>(
-        &self,
+        &mut self,
         worldlines: &mut W,
         weight_function: F,
         rng: &mut impl rand::Rng,
