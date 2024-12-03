@@ -45,8 +45,13 @@ where
         F: Fn(&W, &ProposedUpdate<f64>) -> f64,
     {
         let mut proposal = ProposedUpdate::new();
+
+        let n = worldlines.particles();
+        let t = worldlines.time_slices();
+        let d = worldlines.spatial_dimensions();
+
         // Randomly select an initial particle index
-        let mut p0: usize = rng.gen_range(0..worldlines.particles());
+        let mut p0: usize = rng.gen_range(0..n);
         trace!("Selected particle {}", p0);
         if worldlines.sector() == Sector::G {
             // Navigate the polymer to detect if current polymer is closed.
@@ -69,8 +74,6 @@ where
             };
             trace!("Moving polymer starting from {}", p0);
         }
-        let d = worldlines.spatial_dimensions();
-        let t = worldlines.time_slices();
         // Generate displacement
         let displacements = Array1::from_iter((0..d).map(|_| {
             rng.gen_range(-1.0..=1.0) * self.max_displacement[d % self.max_displacement.len()]
