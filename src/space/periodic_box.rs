@@ -6,12 +6,13 @@ use ndarray::{Array1, ArrayView1};
 /// The `PeriodicBox` struct provides utilities for working with periodic systems, such as
 /// calculating the difference between positions under periodic boundary conditions, wrapping
 /// positions to their fundamental image, and reseating polymers within the box.
-pub struct PeriodicBox {
+#[derive(Debug, PartialEq)]
+pub struct PeriodicBox<const D: usize> {
     /// The lengths of the box in each spatial dimension.
-    lengths: Vec<f64>,
+    lengths: [f64; D],
 }
 
-impl PeriodicBox {
+impl<const D: usize> PeriodicBox<D> {
     /// Creates a new `PeriodicBox` instance.
     ///
     /// # Arguments
@@ -19,7 +20,7 @@ impl PeriodicBox {
     ///
     /// # Returns
     /// A new `PeriodicBox` instance with the specified lengths.
-    pub fn new(lengths: Vec<f64>) -> Self {
+    pub fn new(lengths: [f64; D]) -> Self {
         Self { lengths }
     }
 
@@ -34,12 +35,12 @@ impl PeriodicBox {
     /// * `r2` - The second position.
     ///
     /// # Returns
-    /// A vector containing the periodic difference between `r1` and `r2`,
+    /// A fixed-size array containing the periodic difference between `r1` and `r2`,
     /// ensuring that the result is in the range `[-length/2, length/2]` for each dimension.
     ///
     /// # Panics
     /// Panics if the dimensions of `r1`, `r2`, and the box lengths do not match.
-    pub fn difference<'a, A, B>(&self, r1: A, r2: B) -> Array1<f64>
+    pub fn difference<'a, A, B>(&self, r1: A, r2: B) -> [f64; D]
     where
         A: Into<ArrayView1<'a, f64>>,
         B: Into<ArrayView1<'a, f64>>,
@@ -55,16 +56,17 @@ impl PeriodicBox {
         );
         debug_assert_eq!(
             r1_view.len(),
-            self.lengths.len(),
+            D,
             "Lengths vector must have the same length as input arrays"
         );
 
         // Compute the element-wise difference and apply the nearest-image transformation
-        (&r1_view - &r2_view)
-            .iter()
-            .zip(&self.lengths)
-            .map(|(&x, l)| x - l * (x / l).round())
-            .collect()
+        let mut result = [0.0; D];
+        for i in 0..r1_view.len() {
+            let diff = r1_view[i] - r2_view[i];
+            result[i] = diff - self.lengths[i] * (diff / self.lengths[i]).round();
+        }
+        result
     }
 
     /// Maps a position to its fundamental image within the periodic box.
@@ -139,7 +141,7 @@ impl PeriodicBox {
 #[test]
 fn test_periodic_box_difference() {
     use ndarray::array;
-    let pbc = PeriodicBox::new([1.0, 1.0, 2.0].to_vec());
+    let pbc = PeriodicBox::new([1.0, 1.0, 2.0]);
     let diff = pbc.difference(&array![0.4, 1.1, 1.8], &array![0.0, 0.0, 0.0]);
     let expected = array![0.4, 0.1, -0.2];
     for i in 0..3 {
@@ -150,7 +152,7 @@ fn test_periodic_box_difference() {
 #[test]
 fn test_periodic_box_fundamental_image() {
     use ndarray::array;
-    let pbc = PeriodicBox::new([1.0, 2.0, 4.0].to_vec());
+    let pbc = PeriodicBox::new([1.0, 2.0, 4.0]);
     let image = pbc.fundamental_image(&array![0.6, -3.1, 10.8]);
     let expected = array![0.6, 0.9, 2.8];
     for i in 0..3 {
@@ -168,7 +170,7 @@ fn test_reseat_polymer() {
     use ndarray::{array, Zip};
 
     // Define a periodic box
-    let pbc = PeriodicBox::new(vec![1.0, 1.0, 1.0]); // Box of length 1.0 in all dimensions
+    let pbc = PeriodicBox::new([1.0, 1.0, 1.0]); // Box of length 1.0 in all dimensions
 
     // Polymer object
     let mut worldlines = Worm::<1, 4, 3>::new();
