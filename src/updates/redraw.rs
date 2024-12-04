@@ -4,7 +4,7 @@ use super::proposed_update::ProposedUpdate;
 use crate::path_state::traits::{
     WorldLineDimensions, WorldLinePermutationAccess, WorldLinePositionAccess,
 };
-use log::trace;
+use log::{debug, trace};
 use ndarray::{s, Array2};
 use std::cmp::min;
 
@@ -55,6 +55,7 @@ where
     where
         F: Fn(&W, &ProposedUpdate<f64>) -> f64,
     {
+        debug!("Trying update");
         let mut proposal = ProposedUpdate::new();
 
         let n = worldlines.particles();
@@ -139,7 +140,7 @@ where
                 return false;
             }
         }
-        trace!("Proposal update: {:?}", proposal);
+        trace!("\n{:?}", proposal);
 
         let acceptance_ratio = weight_function(worldlines, &proposal);
         trace!("Acceptance ratio: {}", acceptance_ratio);
@@ -147,7 +148,6 @@ where
         // Apply Metropolis-Hastings acceptance criterion
         let proba = rng.gen::<f64>();
         trace!("Drawn probability: {}", proba);
-
         if proba < acceptance_ratio {
             // Accept the update
             for particle in proposal.get_modified_particles() {
@@ -158,10 +158,12 @@ where
                 }
             }
             self.accept_count += 1;
+            debug!("Move accepted");
             true
         } else {
             // Reject the update
             self.reject_count += 1;
+            debug!("Move rejected");
             false
         }
     }

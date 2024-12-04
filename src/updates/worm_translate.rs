@@ -4,7 +4,7 @@ use crate::path_state::sector::Sector;
 use crate::path_state::traits::{
     WorldLineDimensions, WorldLinePermutationAccess, WorldLinePositionAccess, WorldLineWormAccess,
 };
-use log::trace;
+use log::{debug, trace};
 use ndarray::{Array1, Array2, Axis};
 
 /// A Monte Carlo update that translates open and closed polymers.
@@ -44,6 +44,7 @@ where
     where
         F: Fn(&W, &ProposedUpdate<f64>) -> f64,
     {
+        debug!("Trying update");
         let mut proposal = ProposedUpdate::new();
 
         let n = worldlines.particles();
@@ -104,7 +105,9 @@ where
         trace!("Acceptance ratio {:}", acceptance_ratio);
 
         // Apply Metropolis-Hastings acceptance criterion
-        if rng.gen::<f64>() < acceptance_ratio {
+        let proba = rng.gen::<f64>();
+        trace!("Drawn probability: {}", proba);
+        if proba < acceptance_ratio {
             // Accept the update
             for particle in proposal.get_modified_particles() {
                 if let Some(modifications) = proposal.get_modifications(particle) {
@@ -114,10 +117,12 @@ where
                 }
             }
             self.accept_count += 1;
+            debug!("Move accepted");
             true
         } else {
             // Reject the update
             self.reject_count += 1;
+            debug!("Move rejected");
             false
         }
     }
