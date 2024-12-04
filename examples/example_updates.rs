@@ -29,7 +29,7 @@ fn main() {
     info!("Tail is {:?}", path.worm_tail());
     info!("Sector is {:?}", path.sector());
 
-    let mut mc_transl = WormTranslate::new((&[1.0]).to_vec());
+    let mut mc_transl = WormTranslate::new([1.0].to_vec());
     let mut rng = rand::thread_rng();
 
     let success = mc_transl.try_update(&mut path, |_, _| 0.5, &mut rng);

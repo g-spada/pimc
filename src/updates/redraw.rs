@@ -75,7 +75,7 @@ where
         let delta_t: usize = rng.gen_range(self.min_delta_t..=max_extent);
 
         // Get two_lambda_tau value for particle
-        let two_lambda_tau = (self.two_lambda_tau)(&worldlines, p0);
+        let two_lambda_tau = (self.two_lambda_tau)(worldlines, p0);
         trace!(
             "Selected particle {}, initial slice {}, number of slices {}",
             p0,
@@ -98,47 +98,45 @@ where
             levy_staging(&mut redraw_segment, two_lambda_tau, rng);
             proposal.add_position_modification(p0, t0..(t0 + delta_t + 1), redraw_segment);
             trace!("Segment to redraw is contained in polymer {}. Staging beads from slice {} to slice {}", p0, t0, t0 + delta_t);
+        } else if let Some(p1) = worldlines.following(p0) {
+            // Segment to redraw continues on next polymer p1.
+            // Last bead on polymer p1 is at timeslice t1:
+            let t1 = (t0 + delta_t) % (t - 1);
+            trace!("Segment to redraw is split: using periodicity");
+            trace!(
+                "Staging polymer {} from slice {} to slice {}",
+                p0,
+                t0,
+                t - 1
+            );
+            trace!("Staging polymer {} from slice {} to slice {}", p1, 0, t1);
+            // Reconstruct a continuous path by removing the periodicity jumps induced by the space geometry:
+            // * Compute the difference between the two images of the same bead
+            let images_diff = &worldlines.position(p0, t - 1) - &worldlines.position(p1, 0);
+            // * Insert image (without jumps) of the last bead
+            redraw_segment
+                .row_mut(delta_t)
+                .assign(&(&worldlines.position(p1, t1) + &images_diff));
+            // Apply staging on the segment
+            levy_staging(&mut redraw_segment, two_lambda_tau, rng);
+            proposal.add_position_modification(
+                p0,
+                t0..t,
+                redraw_segment.slice(s![..t - t0, ..]).to_owned(),
+            );
+            // We now remove images_diff from the p1 portion of the segment
+            let mut selected_beads = redraw_segment.slice_mut(s![t - t0 - 1.., ..]);
+            // Subtract the difference vector from all rows at once
+            selected_beads -= &images_diff.broadcast(selected_beads.raw_dim()).unwrap();
+            proposal.add_position_modification(
+                p1,
+                0..t1 + 1,
+                redraw_segment.slice(s![t - t0 - 1.., ..]).to_owned(),
+            );
         } else {
-            if let Some(p1) = worldlines.following(p0) {
-                // Segment to redraw continues on next polymer p1.
-                // Last bead on polymer p1 is at timeslice t1:
-                let t1 = (t0 + delta_t) % (t - 1);
-                trace!("Segment to redraw is split: using periodicity");
-                trace!(
-                    "Staging polymer {} from slice {} to slice {}",
-                    p0,
-                    t0,
-                    t - 1
-                );
-                trace!("Staging polymer {} from slice {} to slice {}", p1, 0, t1);
-                // Reconstruct a continuous path by removing the periodicity jumps induced by the space geometry:
-                // * Compute the difference between the two images of the same bead
-                let images_diff = &worldlines.position(p0, t - 1) - &worldlines.position(p1, 0);
-                // * Insert image (without jumps) of the last bead
-                redraw_segment
-                    .row_mut(delta_t)
-                    .assign(&(&worldlines.position(p1, t1) + &images_diff));
-                // Apply staging on the segment
-                levy_staging(&mut redraw_segment, two_lambda_tau, rng);
-                proposal.add_position_modification(
-                    p0,
-                    t0..t,
-                    redraw_segment.slice(s![..t - t0, ..]).to_owned(),
-                );
-                // We now remove images_diff from the p1 portion of the segment
-                let mut selected_beads = redraw_segment.slice_mut(s![t - t0 - 1.., ..]);
-                // Subtract the difference vector from all rows at once
-                selected_beads -= &images_diff.broadcast(selected_beads.raw_dim()).unwrap();
-                proposal.add_position_modification(
-                    p1,
-                    0..t1 + 1,
-                    redraw_segment.slice(s![t - t0 - 1.., ..]).to_owned(),
-                );
-            } else {
-                // Reached worm head, abort move
-                trace!("Reached worm head, abort move");
-                return false;
-            }
+            // Reached worm head, abort move
+            trace!("Reached worm head, abort move");
+            return false;
         }
         trace!("\n{:?}", proposal);
 
