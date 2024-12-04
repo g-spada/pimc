@@ -1,5 +1,5 @@
 use super::sector::Sector;
-use ndarray::{Array2, ArrayView1, ArrayView2, ArrayViewMut1};
+use ndarray::{Array2, ArrayView1, ArrayView2, ArrayViewMut1, ArrayViewMut2};
 
 /// Trait for querying the dimensional properties of worldlines.
 pub trait WorldLineDimensions {
@@ -26,6 +26,9 @@ pub trait WorldLinePositionAccess {
 
     /// Gets a view of the positions for a specific particle across a range of time slices.
     fn positions(&self, particle: usize, start_slice: usize, end_slice: usize) -> ArrayView2<f64>;
+
+    /// Gets a view of the positions for a specific particle across a range of time slices.
+    fn positions_mut(&mut self, particle: usize, start_slice: usize, end_slice: usize) -> ArrayViewMut2<f64>;
 
     /// Sets the positions for a specific particle across a range of time slices.
     fn set_positions(

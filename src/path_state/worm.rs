@@ -3,7 +3,9 @@ use super::traits::WorldLineDimensions;
 use super::traits::WorldLinePermutationAccess;
 use super::traits::WorldLinePositionAccess;
 use super::traits::WorldLineWormAccess;
-use ndarray::{arr1, s, Array, Array1, Array2, Array3, ArrayView1, ArrayView2, ArrayViewMut1};
+use ndarray::{
+    arr1, s, Array, Array1, Array2, Array3, ArrayView1, ArrayView2, ArrayViewMut1, ArrayViewMut2,
+};
 use serde::{Deserialize, Serialize};
 use serde_json;
 use std::fs::File;
@@ -269,7 +271,12 @@ impl<const N: usize, const M: usize, const D: usize> Worm<N, M, D> {
     /// let positions = world.positions(0, 0, 2);
     /// assert_eq!(positions, array![[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]);
     /// ```
-    pub fn positions(&self, particle: usize, start_slice: usize, end_slice: usize) -> ArrayView2<f64> {
+    pub fn positions(
+        &self,
+        particle: usize,
+        start_slice: usize,
+        end_slice: usize,
+    ) -> ArrayView2<f64> {
         debug_assert!(
             particle < N,
             "Particle index out of bounds: particle={}, max allowed={}",
@@ -292,6 +299,45 @@ impl<const N: usize, const M: usize, const D: usize> Worm<N, M, D> {
         // Extract and return a 2D view using slicing
         self.positions
             .slice(s![particle, start_slice..end_slice, ..])
+    }
+
+    /// Gets a mutable 2D view of the positions for a specific particle across a range of time slices.
+    ///
+    /// # Arguments
+    /// * `particle` - Index of the particle.
+    /// * `start_slice` - Starting index of the time slice (inclusive).
+    /// * `end_slice` - Ending index of the time slice (exclusive).
+    ///
+    /// # Returns
+    /// A mutable 2D array view of the positions for the specified particle and time slice range.
+    pub fn positions_mut(
+        &mut self,
+        particle: usize,
+        start_slice: usize,
+        end_slice: usize,
+    ) -> ArrayViewMut2<f64> {
+        debug_assert!(
+            particle < N,
+            "Particle index out of bounds: particle={}, max allowed={}",
+            particle,
+            N - 1
+        );
+        debug_assert!(
+            start_slice < end_slice,
+            "Invalid slice range: start_slice ({}) must be less than end_slice ({})",
+            start_slice,
+            end_slice
+        );
+        debug_assert!(
+            end_slice <= M,
+            "Time slice range out of bounds: end_slice={}, max allowed={}",
+            end_slice,
+            M
+        );
+
+        // Extract and return a 2D view using slicing
+        self.positions
+            .slice_mut(s![particle, start_slice..end_slice, ..])
     }
 
     /// Sets the positions for a specific particle across a range of time slices.
@@ -485,11 +531,10 @@ impl<const N: usize, const M: usize, const D: usize> Worm<N, M, D> {
     /// A reference to the `Sector` of the worldline.
     pub fn sector(&self) -> Sector {
         if self.worm_tail.is_some() {
-            debug_assert!( self.worm_head.is_some(), "Headless worm!" );
+            debug_assert!(self.worm_head.is_some(), "Headless worm!");
             Sector::G
-        }
-        else {
-            debug_assert!( self.worm_head.is_none(), "Tailless worm!" );
+        } else {
+            debug_assert!(self.worm_head.is_none(), "Tailless worm!");
             Sector::Z
         }
     }
@@ -553,6 +598,11 @@ impl<const N: usize, const M: usize, const D: usize> WorldLinePositionAccess for
         self.positions(particle, start_slice, end_slice)
     }
 
+    /// Gets a view of the positions for a specific particle across a range of time slices.
+    fn positions_mut(&mut self, particle: usize, start_slice: usize, end_slice: usize) -> ArrayViewMut2<f64> {
+        self.positions_mut(particle, start_slice, end_slice)
+    }
+
     /// Sets the positions for a specific particle across a range of time slices.
     fn set_positions(
         &mut self,
@@ -573,7 +623,7 @@ impl<const N: usize, const M: usize, const D: usize> WorldLinePermutationAccess 
 
     ///// Sets the index of the preceding particle in the polymer.
     //fn set_preceding(&mut self, particle: usize, preceding: Option<usize>) {
-        //self.set_preceding(particle, preceding)
+    //self.set_preceding(particle, preceding)
     //}
 
     /// Gets the index of the following particle in the polymer.
@@ -583,7 +633,7 @@ impl<const N: usize, const M: usize, const D: usize> WorldLinePermutationAccess 
 
     ///// Sets the index of the following particle in the polymer.
     //fn set_following(&mut self, particle: usize, following: Option<usize>) {
-        //self.set_following(particle, following)
+    //self.set_following(particle, following)
     //}
 }
 
