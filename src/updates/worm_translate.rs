@@ -7,52 +7,52 @@ use crate::path_state::traits::{
 use log::{debug, trace};
 use ndarray::{Array1, Array2, Axis};
 
-/// A Monte Carlo update that translates open and closed polymers.
-pub struct WormTranslate {
+/// A Monte Carlo update that translates both open and closed polymers.
+pub struct WormTranslate<F, W> {
     max_displacement: Vec<f64>,
+    weight_function: F,
     accept_count: usize,
     reject_count: usize,
+    _phantom: std::marker::PhantomData<W>, // Ensures the type W is associated with the struct without requiring an actual field of type W
 }
 
-impl WormTranslate {
+impl<F, W> WormTranslate<F, W>
+where
+    F: Fn(&W, &ProposedUpdate<f64>) -> f64 + Send + Sync + 'static,
+{
     /// Initializes `WormTranslate` with the specified maximum displacements.
     ///
     /// # Arguments
     /// * `max_displacement` - A vector specifying the maximum displacement for each dimension.
-    pub fn new(max_displacement: Vec<f64>) -> Self {
+    pub fn new(max_displacement: Vec<f64>, weight_function: F) -> Self {
         Self {
             max_displacement,
+            weight_function,
             accept_count: 0,
             reject_count: 0,
+            _phantom: std::marker::PhantomData,
         }
     }
 }
 
-impl<W> MonteCarloUpdate<W, f64> for WormTranslate
+impl<F, W> MonteCarloUpdate<W> for WormTranslate<F, W>
 where
+    F: Fn(&W, &ProposedUpdate<f64>) -> f64 + Send + Sync + 'static,
     W: WorldLineDimensions
         + WorldLinePositionAccess
         + WorldLinePermutationAccess
         + WorldLineWormAccess,
 {
-    fn try_update<F>(
-        &mut self,
-        worldlines: &mut W,
-        weight_function: F,
-        rng: &mut impl rand::Rng,
-    ) -> bool
-    where
-        F: Fn(&W, &ProposedUpdate<f64>) -> f64,
-    {
+    fn try_update(&mut self, worldlines: &mut W, rng: &mut impl rand::Rng) -> bool {
         debug!("Trying update");
         let mut proposal = ProposedUpdate::new();
 
-        let n = worldlines.particles();
-        let t = worldlines.time_slices();
-        let d = worldlines.spatial_dimensions();
+        let tot_particles = worldlines.particles();
+        let tot_slices = worldlines.time_slices();
+        let tot_dimensions = worldlines.spatial_dimensions();
 
         // Randomly select an initial particle index
-        let mut p0: usize = rng.gen_range(0..n);
+        let mut p0: usize = rng.gen_range(0..tot_particles);
         trace!("Selected particle {}", p0);
         if worldlines.sector() == Sector::G {
             // Navigate the polymer to detect if current polymer is closed.
@@ -76,19 +76,20 @@ where
             trace!("Moving polymer starting from {}", p0);
         }
         // Generate displacement
-        let displacements = Array1::from_iter((0..d).map(|_| {
-            rng.gen_range(-1.0..=1.0) * self.max_displacement[d % self.max_displacement.len()]
+        let displacements = Array1::from_iter((0..tot_dimensions).map(|_| {
+            rng.gen_range(-1.0..=1.0)
+                * self.max_displacement[tot_dimensions % self.max_displacement.len()]
         }));
         trace!("Displacement vector {:}", displacements);
 
         // Apply the displacement to the whole polymer
         let mut p = p0;
         loop {
-            let mut new_positions: Array2<f64> = worldlines.positions(p0, 0, t).to_owned();
+            let mut new_positions: Array2<f64> = worldlines.positions(p0, 0, tot_slices).to_owned();
             new_positions
                 .axis_iter_mut(Axis(0))
                 .for_each(|mut slice| slice += &displacements);
-            proposal.add_position_modification(p, 0..t, new_positions);
+            proposal.add_position_modification(p, 0..tot_slices, new_positions);
             if let Some(next) = worldlines.following(p) {
                 if next == p0 {
                     // End of the cycle.
@@ -101,7 +102,7 @@ where
             }
         }
 
-        let acceptance_ratio = weight_function(worldlines, &proposal);
+        let acceptance_ratio = (self.weight_function)(worldlines, &proposal);
         trace!("Acceptance ratio {:}", acceptance_ratio);
 
         // Apply Metropolis-Hastings acceptance criterion
