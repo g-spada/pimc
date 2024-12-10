@@ -31,7 +31,7 @@ fn main() {
     info!("Sector is {:?}", path.sector());
 
     // Translate update
-    let mut mc_transl = WormTranslate::new([1.0].to_vec(), |_, _| 0.5);
+    let mut mc_transl = WormTranslate::new([1.0, 2.0], |_, _| 0.5);
     let mut rng = rand::thread_rng();
 
     let success = mc_transl.try_update(&mut path, &mut rng);

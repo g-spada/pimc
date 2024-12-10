@@ -8,23 +8,27 @@ use log::{debug, trace};
 use ndarray::{Array1, Array2, Axis};
 
 /// A Monte Carlo update that translates both open and closed polymers.
-pub struct WormTranslate<F, W> {
-    max_displacement: Vec<f64>,
+pub struct WormTranslate<F, W, const D: usize> {
+    max_displacement: [f64; D],
     weight_function: F,
     accept_count: usize,
     reject_count: usize,
     _phantom: std::marker::PhantomData<W>, // Ensures the type W is associated with the struct without requiring an actual field of type W
 }
 
-impl<F, W> WormTranslate<F, W>
+impl<F, W, const D: usize> WormTranslate<F, W, D>
 where
     F: Fn(&W, &ProposedUpdate<f64>) -> f64 + Send + Sync + 'static,
+    W: WorldLineDimensions
+        + WorldLinePositionAccess
+        + WorldLinePermutationAccess
+        + WorldLineWormAccess,
 {
     /// Initializes `WormTranslate` with the specified maximum displacements.
     ///
     /// # Arguments
-    /// * `max_displacement` - A vector specifying the maximum displacement for each dimension.
-    pub fn new(max_displacement: Vec<f64>, weight_function: F) -> Self {
+    /// * `max_displacement` - An array specifying the maximum displacement for each dimension.
+    pub fn new(max_displacement: [f64; D], weight_function: F) -> Self {
         Self {
             max_displacement,
             weight_function,
@@ -33,9 +37,38 @@ where
             _phantom: std::marker::PhantomData,
         }
     }
+
+    fn select_initial_particle(&self, worldlines: &W, rng: &mut impl rand::Rng) -> usize {
+        let mut p0: usize = rng.gen_range(0..worldlines.particles());
+        if worldlines.sector() == Sector::G {
+            // Traverse polymer to detect closed or open configuration.
+            p0 = self.traverse_polymer(worldlines, p0);
+        }
+        p0
+    }
+
+    fn traverse_polymer(&self, worldlines: &W, p0: usize) -> usize {
+        let mut p = p0;
+        loop {
+            if let Some(prev) = worldlines.preceding(p) {
+                if prev == p0 {
+                    // Detected a closed cycle. Return start value.
+                    return p0;
+                }
+                p = prev;
+            } else {
+                debug_assert_eq!(
+                    Some(p),
+                    worldlines.worm_tail(),
+                    "Expected to reach the tail in an open polymer"
+                );
+                return p;
+            }
+        }
+    }
 }
 
-impl<F, W> MonteCarloUpdate<W> for WormTranslate<F, W>
+impl<F, W, const D: usize> MonteCarloUpdate<W> for WormTranslate<F, W, D>
 where
     F: Fn(&W, &ProposedUpdate<f64>) -> f64 + Send + Sync + 'static,
     W: WorldLineDimensions
@@ -47,40 +80,17 @@ where
         debug!("Trying update");
         let mut proposal = ProposedUpdate::new();
 
-        let tot_particles = worldlines.particles();
+        //let tot_particles = worldlines.particles();
         let tot_slices = worldlines.time_slices();
-        let tot_dimensions = worldlines.spatial_dimensions();
+        //let tot_dimensions = worldlines.spatial_dimensions();
 
         // Randomly select an initial particle index
-        let mut p0: usize = rng.gen_range(0..tot_particles);
-        trace!("Selected particle {}", p0);
-        if worldlines.sector() == Sector::G {
-            // Navigate the polymer to detect if current polymer is closed.
-            // We keep p0 if polymer is closed, or we set `p0 = tail` if polymer is open.
-            let mut p = p0;
-            p0 = loop {
-                if let Some(prev) = worldlines.preceding(p) {
-                    if prev == p0 {
-                        break p0; // Cycle detected, return the start value
-                    }
-                    p = prev;
-                } else {
-                    debug_assert_eq!(
-                        Some(p),
-                        worldlines.worm_tail(),
-                        "We should have reached the tail"
-                    );
-                    break p; // End reached, return the last valid value
-                }
-            };
-            trace!("Moving polymer starting from {}", p0);
-        }
+        let p0 = self.select_initial_particle(worldlines, rng);
         // Generate displacement
-        let displacements = Array1::from_iter((0..tot_dimensions).map(|_| {
-            rng.gen_range(-1.0..=1.0)
-                * self.max_displacement[tot_dimensions % self.max_displacement.len()]
-        }));
-        trace!("Displacement vector {:}", displacements);
+        let displacement = Array1::from_shape_fn(self.max_displacement.len(), |i| {
+            rng.gen_range(-self.max_displacement[i]..=self.max_displacement[i])
+        });
+        trace!("Displacement vector {:}", displacement);
 
         // Apply the displacement to the whole polymer
         let mut p = p0;
@@ -88,7 +98,12 @@ where
             let mut new_positions: Array2<f64> = worldlines.positions(p0, 0, tot_slices).to_owned();
             new_positions
                 .axis_iter_mut(Axis(0))
-                .for_each(|mut slice| slice += &displacements);
+                .for_each(|mut slice| slice += &displacement);
+            debug_assert_eq!(
+                new_positions.shape()[0],
+                tot_slices,
+                "Expected positions to match time slices"
+            );
             proposal.add_position_modification(p, 0..tot_slices, new_positions);
             if let Some(next) = worldlines.following(p) {
                 if next == p0 {
