@@ -4,8 +4,9 @@ use crate::path_state::sector::Sector;
 use crate::path_state::traits::{
     WorldLineDimensions, WorldLinePermutationAccess, WorldLinePositionAccess, WorldLineWormAccess,
 };
+use crate::path_state::traverse_polymer::traverse_polymer;
 use log::{debug, trace};
-use ndarray::{Array1, Array2, Axis};
+use ndarray::Array1;
 
 /// A Monte Carlo update that translates both open and closed polymers.
 pub struct WormTranslate<F, W, const D: usize> {
@@ -42,29 +43,9 @@ where
         let mut p0: usize = rng.gen_range(0..worldlines.particles());
         if worldlines.sector() == Sector::G {
             // Traverse polymer to detect closed or open configuration.
-            p0 = self.traverse_polymer(worldlines, p0);
+            p0 = traverse_polymer(worldlines, p0);
         }
         p0
-    }
-
-    fn traverse_polymer(&self, worldlines: &W, p0: usize) -> usize {
-        let mut p = p0;
-        loop {
-            if let Some(prev) = worldlines.preceding(p) {
-                if prev == p0 {
-                    // Detected a closed cycle. Return start value.
-                    return p0;
-                }
-                p = prev;
-            } else {
-                debug_assert_eq!(
-                    Some(p),
-                    worldlines.worm_tail(),
-                    "Expected to reach the tail in an open polymer"
-                );
-                return p;
-            }
-        }
     }
 }
 
@@ -95,15 +76,14 @@ where
         // Apply the displacement to the whole polymer
         let mut p = p0;
         loop {
-            let mut new_positions: Array2<f64> = worldlines.positions(p0, 0, tot_slices).to_owned();
-            new_positions
-                .axis_iter_mut(Axis(0))
-                .for_each(|mut slice| slice += &displacement);
+            let new_positions = displacement.broadcast([tot_slices, D]).unwrap().to_owned()
+                + worldlines.positions(p0, 0, tot_slices);
             debug_assert_eq!(
                 new_positions.shape()[0],
                 tot_slices,
                 "Expected positions to match time slices"
             );
+
             proposal.add_position_modification(p, 0..tot_slices, new_positions);
             if let Some(next) = worldlines.following(p) {
                 if next == p0 {
