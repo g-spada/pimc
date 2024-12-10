@@ -3,18 +3,18 @@ use ndarray::{Array2, ArrayView1, ArrayView2, ArrayViewMut1, ArrayViewMut2};
 
 /// Trait for querying the dimensional properties of worldlines.
 pub trait WorldLineDimensions {
-    /// Returns the number of particles in the system.
-    fn particles(&self) -> usize;
+    const TIME_SLICES: usize;
 
-    /// Returns the number of time slices in the system.
-    fn time_slices(&self) -> usize;
-
-    /// Returns the number of spatial dimensions.
-    fn spatial_dimensions(&self) -> usize;
+    /// Space dimensionality.
+    const SPATIAL_DIMENSIONS: usize;
 }
 
 /// Trait for accessing and modifying particle positions in worldlines.
 pub trait WorldLinePositionAccess {
+    /// Returns the number of particles in the system.
+    fn particles(&self) -> usize;
+
+    /// Number of time slices in the system.
     /// Gets a view of the position of a specific particle at a specific time slice.
     fn position(&self, particle: usize, time_slice: usize) -> ArrayView1<f64>;
 
@@ -28,7 +28,12 @@ pub trait WorldLinePositionAccess {
     fn positions(&self, particle: usize, start_slice: usize, end_slice: usize) -> ArrayView2<f64>;
 
     /// Gets a view of the positions for a specific particle across a range of time slices.
-    fn positions_mut(&mut self, particle: usize, start_slice: usize, end_slice: usize) -> ArrayViewMut2<f64>;
+    fn positions_mut(
+        &mut self,
+        particle: usize,
+        start_slice: usize,
+        end_slice: usize,
+    ) -> ArrayViewMut2<f64>;
 
     /// Sets the positions for a specific particle across a range of time slices.
     fn set_positions(

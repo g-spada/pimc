@@ -116,11 +116,7 @@ impl<const D: usize> PeriodicBox<D> {
     {
         // Validate input
         debug_assert!(particle < worldlines.particles(), "Invalid particle index");
-        debug_assert_eq!(
-            D,
-            worldlines.spatial_dimensions(),
-            "Spatial dimensions don't match"
-        );
+        debug_assert_eq!(D, W::SPATIAL_DIMENSIONS, "Spatial dimensions don't match");
 
         // Compute the fundamental image of the first bead
         let first_image = self.fundamental_image(worldlines.position(particle, 0));
@@ -128,13 +124,10 @@ impl<const D: usize> PeriodicBox<D> {
         // Compute the shift
         let shift = &first_image - &worldlines.position(particle, 0);
 
-        // Extract the total time slices and the current positions
-        let total_time_slices = worldlines.time_slices();
-
-        let mut whole_polymer = worldlines.positions_mut(particle, 0, total_time_slices);
+        let mut whole_polymer = worldlines.positions_mut(particle, 0, W::TIME_SLICES);
 
         // Add the shift to each bead of the polymer
-        whole_polymer += &shift.view().broadcast([total_time_slices, D]).unwrap();
+        whole_polymer += &shift.view().broadcast([W::TIME_SLICES, D]).unwrap();
     }
 }
 
@@ -176,7 +169,12 @@ fn test_reseat_polymer() {
     let mut worldlines = Worm::<1, 4, 3>::new();
 
     // Initial polymer positions: Particle 0, slices 0-2
-    let initial_positions = array![[1.2, -0.8, 0.5], [1.3, -0.9, 0.4], [1.1, -1.1, 0.6], [0.0, 0.0, 0.0]];
+    let initial_positions = array![
+        [1.2, -0.8, 0.5],
+        [1.3, -0.9, 0.4],
+        [1.1, -1.1, 0.6],
+        [0.0, 0.0, 0.0]
+    ];
 
     worldlines.set_positions(0, 0, 4, &initial_positions);
 

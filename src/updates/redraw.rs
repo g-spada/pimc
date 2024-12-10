@@ -56,19 +56,17 @@ where
         let mut proposal = ProposedUpdate::new();
 
         let tot_particles = worldlines.particles();
-        let tot_slices = worldlines.time_slices();
-        let tot_dimensions = worldlines.spatial_dimensions();
 
         // Randomly select an initial particle index
         let p0: usize = rng.gen_range(0..tot_particles);
         // Randomly select an initial time-slice
-        let t0: usize = rng.gen_range(0..tot_slices - 1);
+        let t0: usize = rng.gen_range(0..W::TIME_SLICES - 1);
         // Randomly select the extent of the polymer to redraw. The segment is composed by `delta_t + 1` beads.
         // The first and last beads are kept fixed, the remaining `delta_t - 1` beads are redrawn.
         // The maximum extent is limited to t-2 to ensure two distinct fixed points in the staging
         // procedure (this limitation could in principle be relaxed to t-1 after modifying the
         // assertions on ProposedUpdate).
-        let max_extent = min(self.max_delta_t, tot_slices - 2);
+        let max_extent = min(self.max_delta_t, W::TIME_SLICES - 2);
         let delta_t: usize = rng.gen_range(self.min_delta_t..=max_extent);
 
         // Get two_lambda_tau value for particle
@@ -81,12 +79,12 @@ where
         );
 
         // Create an owned array and copy the initial bead (p0,t0)
-        let mut redraw_segment = Array2::<f64>::zeros((delta_t + 1, tot_dimensions));
+        let mut redraw_segment = Array2::<f64>::zeros((delta_t + 1, W::SPATIAL_DIMENSIONS));
         redraw_segment
             .row_mut(0)
             .assign(&worldlines.position(p0, t0));
 
-        if t0 + delta_t < tot_slices {
+        if t0 + delta_t < W::TIME_SLICES {
             // Segment to redraw is within the first polymer: copy the last bead
             redraw_segment
                 .row_mut(delta_t)
@@ -98,19 +96,19 @@ where
         } else if let Some(p1) = worldlines.following(p0) {
             // Segment to redraw continues on next polymer p1.
             // Last bead on polymer p1 is at timeslice t1:
-            let t1 = (t0 + delta_t) % (tot_slices - 1);
+            let t1 = (t0 + delta_t) % (W::TIME_SLICES - 1);
             trace!("Segment to redraw is split: using periodicity");
             trace!(
                 "Staging polymer {} from slice {} to slice {}",
                 p0,
                 t0,
-                tot_slices - 1
+                W::TIME_SLICES - 1
             );
             trace!("Staging polymer {} from slice {} to slice {}", p1, 0, t1);
             // Reconstruct a continuous path by removing the periodicity jumps induced by the space geometry:
             // * Compute the difference between the two images of the same bead
             let images_diff =
-                &worldlines.position(p0, tot_slices - 1) - &worldlines.position(p1, 0);
+                &worldlines.position(p0, W::TIME_SLICES - 1) - &worldlines.position(p1, 0);
             // * Insert image (without jumps) of the last bead
             redraw_segment
                 .row_mut(delta_t)
@@ -119,18 +117,20 @@ where
             levy_staging(&mut redraw_segment, two_lambda_tau, rng);
             proposal.add_position_modification(
                 p0,
-                t0..tot_slices,
-                redraw_segment.slice(s![..tot_slices - t0, ..]).to_owned(),
+                t0..W::TIME_SLICES,
+                redraw_segment
+                    .slice(s![..W::TIME_SLICES - t0, ..])
+                    .to_owned(),
             );
             // We now remove images_diff from the p1 portion of the segment
-            let mut selected_beads = redraw_segment.slice_mut(s![tot_slices - t0 - 1.., ..]);
+            let mut selected_beads = redraw_segment.slice_mut(s![W::TIME_SLICES - t0 - 1.., ..]);
             // Subtract the difference vector from all rows at once
             selected_beads -= &images_diff.broadcast(selected_beads.raw_dim()).unwrap();
             proposal.add_position_modification(
                 p1,
                 0..t1 + 1,
                 redraw_segment
-                    .slice(s![tot_slices - t0 - 1.., ..])
+                    .slice(s![W::TIME_SLICES - t0 - 1.., ..])
                     .to_owned(),
             );
         } else {

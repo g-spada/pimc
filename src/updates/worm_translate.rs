@@ -30,6 +30,11 @@ where
     /// # Arguments
     /// * `max_displacement` - An array specifying the maximum displacement for each dimension.
     pub fn new(max_displacement: [f64; D], weight_function: F) -> Self {
+        assert_eq!(
+            D,
+            W::SPATIAL_DIMENSIONS,
+            "Mismatch in the spatial dimensions"
+        );
         Self {
             max_displacement,
             weight_function,
@@ -61,10 +66,6 @@ where
         debug!("Trying update");
         let mut proposal = ProposedUpdate::new();
 
-        //let tot_particles = worldlines.particles();
-        let tot_slices = worldlines.time_slices();
-        //let tot_dimensions = worldlines.spatial_dimensions();
-
         // Randomly select an initial particle index
         let p0 = self.select_initial_particle(worldlines, rng);
         // Generate displacement
@@ -76,15 +77,18 @@ where
         // Apply the displacement to the whole polymer
         let mut p = p0;
         loop {
-            let new_positions = displacement.broadcast([tot_slices, D]).unwrap().to_owned()
-                + worldlines.positions(p0, 0, tot_slices);
+            let new_positions = displacement
+                .broadcast([W::TIME_SLICES, D])
+                .unwrap()
+                .to_owned()
+                + worldlines.positions(p0, 0, W::TIME_SLICES);
             debug_assert_eq!(
                 new_positions.shape()[0],
-                tot_slices,
+                W::TIME_SLICES,
                 "Expected positions to match time slices"
             );
 
-            proposal.add_position_modification(p, 0..tot_slices, new_positions);
+            proposal.add_position_modification(p, 0..W::TIME_SLICES, new_positions);
             if let Some(next) = worldlines.following(p) {
                 if next == p0 {
                     // End of the cycle.

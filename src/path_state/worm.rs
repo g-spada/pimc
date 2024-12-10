@@ -561,23 +561,19 @@ impl<const N: usize, const M: usize, const D: usize> Worm<N, M, D> {
 }
 
 impl<const N: usize, const M: usize, const D: usize> WorldLineDimensions for Worm<N, M, D> {
+    /// The number of time slices in the system.
+    const TIME_SLICES: usize = M;
+
+    /// The number of spatial dimensions.
+    const SPATIAL_DIMENSIONS: usize = D;
+}
+
+impl<const N: usize, const M: usize, const D: usize> WorldLinePositionAccess for Worm<N, M, D> {
     /// Returns the number of particles in the system.
     fn particles(&self) -> usize {
         self.particles()
     }
 
-    /// Returns the number of time slices in the system.
-    fn time_slices(&self) -> usize {
-        self.time_slices()
-    }
-
-    /// Returns the number of spatial dimensions.
-    fn spatial_dimensions(&self) -> usize {
-        self.spatial_dimensions()
-    }
-}
-
-impl<const N: usize, const M: usize, const D: usize> WorldLinePositionAccess for Worm<N, M, D> {
     /// Gets a view of the position of a specific particle at a specific time slice.
     fn position(&self, particle: usize, time_slice: usize) -> ArrayView1<f64> {
         self.position(particle, time_slice)
@@ -599,7 +595,12 @@ impl<const N: usize, const M: usize, const D: usize> WorldLinePositionAccess for
     }
 
     /// Gets a view of the positions for a specific particle across a range of time slices.
-    fn positions_mut(&mut self, particle: usize, start_slice: usize, end_slice: usize) -> ArrayViewMut2<f64> {
+    fn positions_mut(
+        &mut self,
+        particle: usize,
+        start_slice: usize,
+        end_slice: usize,
+    ) -> ArrayViewMut2<f64> {
         self.positions_mut(particle, start_slice, end_slice)
     }
 
