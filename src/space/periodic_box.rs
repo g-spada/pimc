@@ -18,9 +18,16 @@ impl<const D: usize> PeriodicBox<D> {
     /// # Arguments
     /// * `lengths` - A vector specifying the lengths of the box in each spatial dimension.
     ///
+    /// # Panics
+    /// Panics if any value in `lengths` is less than or equal to zero.
+    ///
     /// # Returns
     /// A new `PeriodicBox` instance with the specified lengths.
     pub fn new(lengths: [f64; D]) -> Self {
+        assert!(
+            lengths.iter().all(|&l| l > 0.0),
+            "All box lengths must be positive."
+        );
         Self { lengths }
     }
 
@@ -67,6 +74,32 @@ impl<const D: usize> PeriodicBox<D> {
             result[i] = diff - self.lengths[i] * (diff / self.lengths[i]).round();
         }
         result
+    }
+
+    /// Computes the Euclidean distance between two positions under periodic boundary conditions.
+    ///
+    /// This method calculates the periodic difference between two positions
+    /// and then computes the Euclidean distance using the nearest-image convention.
+    ///
+    /// # Arguments
+    /// * `r1` - The first position.
+    /// * `r2` - The second position.
+    ///
+    /// # Returns
+    /// The Euclidean distance between `r1` and `r2` under periodic boundary conditions.
+    ///
+    /// # Panics
+    /// Panics if the dimensions of `r1`, `r2`, and the box lengths do not match.
+    pub fn distance<'a, A, B>(&self, r1: A, r2: B) -> f64
+    where
+        A: Into<ArrayView1<'a, f64>>,
+        B: Into<ArrayView1<'a, f64>>,
+    {
+        // Compute the periodic difference between the two positions.
+        let diff = self.difference(r1, r2);
+
+        // Compute the Euclidean distance as the square root of the sum of squared differences.
+        diff.iter().map(|&d| d * d).sum::<f64>().sqrt()
     }
 
     /// Maps a position to its fundamental image within the periodic box.
@@ -194,4 +227,63 @@ fn test_reseat_polymer() {
     Zip::from(&expected_positions)
         .and(result)
         .for_each(|&val1, &val2| assert!((val1 - val2).abs() < 1e-15));
+}
+
+#[test]
+fn test_periodic_box_distance() {
+    use ndarray::array;
+
+    // Define a periodic box with lengths for each dimension.
+    let pbc = PeriodicBox::new([1.0, 2.0, 3.0]);
+
+    // Test 1: Points without crossing boundaries.
+    let r1 = array![0.4, 1.1, 1.4];
+    let r2 = array![0.9, 0.1, 1.8];
+    let dist = pbc.distance(&r1, &r2);
+
+    // Expected distance calculated manually: sqrt(0.5^2 + 1.0^2 + 0.4^2) =~ 1.1874...
+    let expected = (0.5f64.powi(2) + 1.0f64.powi(2) + 0.4f64.powi(2)).sqrt();
+    assert!(
+        (dist - expected).abs() < 1e-10,
+        "Test 1 failed: distance = {:.10}",
+        dist
+    );
+
+    // Test 2: Points crossing boundaries (wrap-around).
+    let r3 = array![0.9, 1.9, 2.9];
+    let r4 = array![0.1, 0.1, 0.1];
+    let dist = pbc.distance(&r3, &r4);
+
+    // Expected distance: Nearest-image convention
+    // - For dimension 1: |0.9 - 0.1 - 1.0| = 0.2
+    // - For dimension 2: Nearest image is |1.9 - 0.1 - 2.0| = 0.2
+    // - For dimension 3: Nearest image is |2.9 - 0.1 - 3.0| = 0.2
+    let expected = (0.2f64.powi(2) + 0.2f64.powi(2) + 0.2f64.powi(2)).sqrt();
+    assert!(
+        (dist - expected).abs() < 1e-10,
+        "Test 2 failed: distance = {:.10}",
+        dist
+    );
+
+    // Test 3: Identical points (distance should be zero).
+    let r5 = array![0.5, 1.0, 1.5];
+    let r6 = array![0.5, 1.0, 1.5];
+    let dist = pbc.distance(&r5, &r6);
+
+    assert!(
+        (dist).abs() < 1e-10,
+        "Test 3 failed: distance = {:.10}",
+        dist
+    );
+
+    // Test 4: Periodic images of the same point (distance should be zero).
+    let r7 = array![0.5, 1.0, 1.0];
+    let r8 = array![-0.5, 5.0, -5.0];
+    let dist = pbc.distance(&r7, &r8);
+
+    assert!(
+        (dist).abs() < 1e-10,
+        "Test 4 failed: distance = {:.10}",
+        dist
+    );
 }
