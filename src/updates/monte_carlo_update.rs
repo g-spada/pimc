@@ -1,3 +1,5 @@
+use super::accepted_update::AcceptedUpdate;
+
 pub trait MonteCarloUpdate<W> {
     /// Apply a Monte Carlo update to the given worldlines.
     ///
@@ -7,6 +9,10 @@ pub trait MonteCarloUpdate<W> {
     /// - `rng`: A random number generator.
     ///
     /// # Returns
-    /// `true` if the update was accepted, `false` otherwise.
-    fn try_update(&mut self, worldlines: &mut W, rng: &mut impl rand::Rng) -> bool;
+    /// An `Option<AcceptedUpdate>`.
+    fn try_update(
+        &mut self,
+        worldlines: &mut W,
+        rng: &mut impl rand::Rng,
+    ) -> Option<AcceptedUpdate>;
 }

@@ -1,3 +1,4 @@
+use super::accepted_update::AcceptedUpdate;
 use ndarray::Array2;
 use std::collections::{BTreeSet, HashMap};
 use std::ops::Range;
@@ -214,12 +215,37 @@ impl<T> ProposedUpdate<T> {
     pub fn get_modified_particles(&self) -> Vec<usize> {
         self.modified_particles.iter().cloned().collect()
     }
+
+    /// Converts a `ProposedUpdate<T>` into a `SimplifiedUpdate` by extracting
+    /// only the `Range<usize>` from each modification, along with the
+    /// `modified_timeslices` and `modified_particles`.
+    pub fn to_accepted_update(&self) -> AcceptedUpdate {
+        let mut accepted_modifications = HashMap::new();
+
+        // Extract modifications for each particle
+        for (particle_index, particle_modifications) in &self.modifications {
+            let ranges: Vec<Range<usize>> = particle_modifications
+                .iter()
+                .map(|(range, _)| range.clone()) // Extract only the range
+                .collect();
+            accepted_modifications.insert(*particle_index, ranges);
+        }
+
+        // Create and return the simplified update
+        AcceptedUpdate {
+            modifications: accepted_modifications,
+            modified_timeslices: self.modified_timeslices.clone(), // Copy the timeslices
+            modified_particles: self.modified_particles.clone(),   // Copy the particles
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use ndarray::array;
+    use std::collections::{BTreeSet, HashMap};
+    use std::ops::Range;
 
     #[test]
     fn test_new() {
@@ -280,5 +306,49 @@ mod tests {
 
         // Adding an overlapping modification for range 4..8 should panic
         updates.add_position_modification(1, 4..8, positions2);
+    }
+
+    #[test]
+    fn test_to_accepted_update() {
+        // Step 1: Create a sample ProposedUpdate
+        let mut modifications = HashMap::new();
+        modifications.insert(
+            0,
+            vec![
+                (0..3, Array2::zeros((3, 3))),
+                (8..10, Array2::zeros((2, 3))),
+            ],
+        );
+        modifications.insert(
+            1,
+            vec![
+                (2..5, Array2::zeros((3, 3))),
+                (10..12, Array2::zeros((2, 3))),
+            ],
+        );
+
+        let modified_timeslices = BTreeSet::from([0, 1, 2, 3, 4, 5, 8, 9, 10, 11]);
+        let modified_particles = BTreeSet::from([0, 1]);
+
+        let proposed_update = ProposedUpdate::<f64> {
+            modifications,
+            modified_timeslices: modified_timeslices.clone(),
+            modified_particles: modified_particles.clone(),
+        };
+
+        // Step 2: Convert to SimplifiedUpdate
+        let accepted_update = proposed_update.to_accepted_update();
+
+        // Step 3: Validate the SimplifiedUpdate
+        // Validate modifications
+        let expected_modifications: HashMap<usize, Vec<Range<usize>>> =
+            HashMap::from([(0, vec![0..3, 8..10]), (1, vec![2..5, 10..12])]);
+        assert_eq!(accepted_update.modifications, expected_modifications);
+
+        // Validate modified_timeslices
+        assert_eq!(accepted_update.modified_timeslices, modified_timeslices);
+
+        // Validate modified_particles
+        assert_eq!(accepted_update.modified_particles, modified_particles);
     }
 }

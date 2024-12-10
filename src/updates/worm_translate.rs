@@ -1,3 +1,4 @@
+use super::accepted_update::AcceptedUpdate;
 use super::monte_carlo_update::MonteCarloUpdate;
 use super::proposed_update::ProposedUpdate;
 use crate::path_state::sector::Sector;
@@ -62,7 +63,11 @@ where
         + WorldLinePermutationAccess
         + WorldLineWormAccess,
 {
-    fn try_update(&mut self, worldlines: &mut W, rng: &mut impl rand::Rng) -> bool {
+    fn try_update(
+        &mut self,
+        worldlines: &mut W,
+        rng: &mut impl rand::Rng,
+    ) -> Option<AcceptedUpdate> {
         debug!("Trying update");
         let mut proposal = ProposedUpdate::new();
 
@@ -118,12 +123,12 @@ where
             }
             self.accept_count += 1;
             debug!("Move accepted");
-            true
+            Some(proposal.to_accepted_update())
         } else {
             // Reject the update
             self.reject_count += 1;
             debug!("Move rejected");
-            false
+            None
         }
     }
 }

@@ -35,8 +35,8 @@ fn main() {
     let mut rng = rand::thread_rng();
 
     let success = mc_transl.try_update(&mut path, &mut rng);
-    if success {
-        for part in 0..path.particles() {
+    if let Some(update) = success {
+        for part in update.modified_particles {
             info!(
                 "New path for p = {}\n{:?}",
                 part,
@@ -48,8 +48,8 @@ fn main() {
     // Redraw update
     let mut mc_redraw = Redraw::new(M / 3, M - 1, two_lambda_tau, |_, _| 0.5);
     let success = mc_redraw.try_update(&mut path, &mut rng);
-    if success {
-        for part in 0..path.particles() {
+    if let Some(update) = success {
+        for part in update.modified_particles {
             info!(
                 "New path for p = {}\n{:?}",
                 part,

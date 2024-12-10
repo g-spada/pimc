@@ -1,3 +1,4 @@
+use super::accepted_update::AcceptedUpdate;
 use super::levy_staging::levy_staging;
 use super::monte_carlo_update::MonteCarloUpdate;
 use super::proposed_update::ProposedUpdate;
@@ -6,15 +7,64 @@ use crate::path_state::traits::{
 };
 use log::{debug, trace};
 use ndarray::{s, Array2};
-use std::cmp::min;
 
-/// A Monte Carlo update that translates open and closed polymers.
+/// A Monte Carlo update that redraws segments of open or closed polymers in a path integral simulation.
+///
+/// The `Redraw` struct implements a Monte Carlo move where segments of particle worldlines
+/// are randomly selected and redrawn using the Levy staging algorithm. This move is
+/// designed to improve sampling efficiency in simulations of quantum systems.
+///
+/// # Type Parameters
+/// - `F`: A function type for computing the weight of a proposed update.
+/// - `W`: The type representing the state of the particle worldlines, which must
+///   implement the required traits for accessing and modifying particle positions.
+///
+/// # Fields
+/// - `min_delta_t`: The minimum length (in time slices) of a segment to redraw. Must be greater than 1.
+/// - `max_delta_t`: The maximum length (in time slices) of a segment to redraw. Must be greater than or equal to `min_delta_t`.
+/// - `two_lambda_tau`: A function that computes a parameter required for the Levy staging algorithm,
+///   based on the worldline state and the particle index.
+/// - `weight_function`: A user-defined function that calculates the acceptance ratio for a proposed update.
+/// - `accept_count`: Tracks the number of updates that have been accepted.
+/// - `reject_count`: Tracks the number of updates that have been rejected.
+///
+/// # Usage
+/// The `Redraw` struct is typically used in path integral Monte Carlo simulations.
+/// It selects a random particle and a segment of its worldline, applies Levy staging to redraw
+/// the segment, and evaluates the move using the Metropolis-Hastings criterion.
+///
+/// The `try_update` method performs the update and modifies the state of the worldlines if the
+/// move is accepted.
+///
+/// # Panics
+/// - If `min_delta_t` is less than or equal to 1.
+/// - If `min_delta_t` is greater than `max_delta_t`.
+///
+/// # See Also
+/// - `levy_staging`: The algorithm used for sampling the redrawn segment.
+/// - `ProposedUpdate`: Used to manage and track the modifications made during the update.
+///
 pub struct Redraw<F, W> {
+    /// The minimum extent of the segment to redraw, in time slices.
+    /// Must be greater than 1.
     min_delta_t: usize,
+
+    /// The maximum extent of the segment to redraw, in time slices.
+    /// Must be greater than or equal to `min_delta_t`.
     max_delta_t: usize,
+
+    /// A function that computes the `two_lambda_tau` parameter for the Levy staging algorithm
+    /// based on the state of the worldlines and the particle index.
     two_lambda_tau: fn(&W, p: usize) -> f64,
+
+    /// A user-defined function that calculates the acceptance ratio for the proposed update.
+    /// This function takes the current state of the worldlines and the proposed update as input.
     weight_function: F,
+
+    /// Tracks the number of updates that have been accepted.
     accept_count: usize,
+
+    /// Tracks the number of updates that have been rejected.
     reject_count: usize,
 }
 
@@ -23,7 +73,6 @@ where
     F: Fn(&W, &ProposedUpdate<f64>) -> f64 + Send + Sync + 'static,
     W: WorldLineDimensions + WorldLinePositionAccess + WorldLinePermutationAccess,
 {
-    /// Initializes `Redraw`.
     pub fn new(
         min_delta_t: usize,
         max_delta_t: usize,
@@ -34,6 +83,10 @@ where
         assert!(
             min_delta_t <= max_delta_t,
             "`min_delta_t`cannot be greater than `max_delta_t`"
+        );
+        assert!(
+            max_delta_t < W::TIME_SLICES - 1,
+            "max_delta_t cannot be greater than W::TIME_SLICES - 2"
         );
         Self {
             min_delta_t,
@@ -51,7 +104,11 @@ where
     F: Fn(&W, &ProposedUpdate<f64>) -> f64 + Send + Sync + 'static,
     W: WorldLineDimensions + WorldLinePositionAccess + WorldLinePermutationAccess,
 {
-    fn try_update(&mut self, worldlines: &mut W, rng: &mut impl rand::Rng) -> bool {
+    fn try_update(
+        &mut self,
+        worldlines: &mut W,
+        rng: &mut impl rand::Rng,
+    ) -> Option<AcceptedUpdate> {
         debug!("Trying update");
         let mut proposal = ProposedUpdate::new();
 
@@ -66,8 +123,7 @@ where
         // The maximum extent is limited to t-2 to ensure two distinct fixed points in the staging
         // procedure (this limitation could in principle be relaxed to t-1 after modifying the
         // assertions on ProposedUpdate).
-        let max_extent = min(self.max_delta_t, W::TIME_SLICES - 2);
-        let delta_t: usize = rng.gen_range(self.min_delta_t..=max_extent);
+        let delta_t: usize = rng.gen_range(self.min_delta_t..=self.max_delta_t);
 
         // Get two_lambda_tau value for particle
         let two_lambda_tau = (self.two_lambda_tau)(worldlines, p0);
@@ -136,7 +192,7 @@ where
         } else {
             // Reached worm head, abort move
             trace!("Reached worm head, abort move");
-            return false;
+            return None;
         }
         trace!("\n{:?}", proposal);
 
@@ -157,12 +213,12 @@ where
             }
             self.accept_count += 1;
             debug!("Move accepted");
-            true
+            Some(proposal.to_accepted_update())
         } else {
             // Reject the update
             self.reject_count += 1;
             debug!("Move rejected");
-            false
+            None
         }
     }
 }

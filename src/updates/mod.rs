@@ -1,3 +1,4 @@
+pub mod accepted_update;
 pub mod levy_staging;
 pub mod monte_carlo_update;
 pub mod proposed_update;
