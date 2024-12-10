@@ -164,126 +164,128 @@ impl<const D: usize> PeriodicBox<D> {
     }
 }
 
-#[test]
-fn test_periodic_box_difference() {
-    use ndarray::array;
-    let pbc = PeriodicBox::new([1.0, 1.0, 2.0]);
-    let diff = pbc.difference(&array![0.4, 1.1, 1.8], &array![0.0, 0.0, 0.0]);
-    let expected = array![0.4, 0.1, -0.2];
-    for i in 0..3 {
-        assert!((diff[i] - expected[i]).abs() < 1e-15);
-    }
-}
-
-#[test]
-fn test_periodic_box_fundamental_image() {
-    use ndarray::array;
-    let pbc = PeriodicBox::new([1.0, 2.0, 4.0]);
-    let image = pbc.fundamental_image(&array![0.6, -3.1, 10.8]);
-    let expected = array![0.6, 0.9, 2.8];
-    for i in 0..3 {
-        assert!((image[i] - expected[i]).abs() < 1e-15);
-    }
-    let image = pbc.fundamental_image(&array![-3.0, 0.0, 8.0]);
-    for i in 0..3 {
-        assert!((image[i] - 0.0).abs() < 1e-15);
-    }
-}
-
-#[test]
-fn test_reseat_polymer() {
-    use crate::path_state::worm::Worm;
+#[cfg(test)]
+mod tests {
+    use crate::space::periodic_box::PeriodicBox;
     use ndarray::{array, Zip};
 
-    // Define a periodic box
-    let pbc = PeriodicBox::new([1.0, 1.0, 1.0]); // Box of length 1.0 in all dimensions
+    #[test]
+    fn test_periodic_box_difference() {
+        use ndarray::array;
+        let pbc = PeriodicBox::new([1.0, 1.0, 2.0]);
+        let diff = pbc.difference(&array![0.4, 1.1, 1.8], &array![0.0, 0.0, 0.0]);
+        let expected = array![0.4, 0.1, -0.2];
+        for i in 0..3 {
+            assert!((diff[i] - expected[i]).abs() < 1e-15);
+        }
+    }
 
-    // Polymer object
-    let mut worldlines = Worm::<1, 4, 3>::new();
+    #[test]
+    fn test_periodic_box_fundamental_image() {
+        let pbc = PeriodicBox::new([1.0, 2.0, 4.0]);
+        let image = pbc.fundamental_image(&array![0.6, -3.1, 10.8]);
+        let expected = array![0.6, 0.9, 2.8];
+        for i in 0..3 {
+            assert!((image[i] - expected[i]).abs() < 1e-15);
+        }
+        let image = pbc.fundamental_image(&array![-3.0, 0.0, 8.0]);
+        for i in 0..3 {
+            assert!((image[i] - 0.0).abs() < 1e-15);
+        }
+    }
 
-    // Initial polymer positions: Particle 0, slices 0-2
-    let initial_positions = array![
-        [1.2, -0.8, 0.5],
-        [1.3, -0.9, 0.4],
-        [1.1, -1.1, 0.6],
-        [0.0, 0.0, 0.0]
-    ];
+    #[test]
+    fn test_reseat_polymer() {
+        use crate::path_state::worm::Worm;
 
-    worldlines.set_positions(0, 0, 4, &initial_positions);
+        // Define a periodic box
+        let pbc = PeriodicBox::new([1.0, 1.0, 1.0]); // Box of length 1.0 in all dimensions
 
-    // Reseat the polymer for particle 0
-    pbc.reseat_polymer(&mut worldlines, 0);
+        // Polymer object
+        let mut worldlines = Worm::<1, 4, 3>::new();
 
-    // Expected positions after reseating
-    let expected_positions = array![
-        [0.2, 0.2, 0.5],
-        [0.3, 0.1, 0.4],
-        [0.1, -0.1, 0.6],
-        [-1.0, 1.0, 0.0]
-    ];
+        // Initial polymer positions: Particle 0, slices 0-2
+        let initial_positions = array![
+            [1.2, -0.8, 0.5],
+            [1.3, -0.9, 0.4],
+            [1.1, -1.1, 0.6],
+            [0.0, 0.0, 0.0]
+        ];
 
-    // Assert that the positions match the expected values
-    let result = worldlines.positions(0, 0, 4);
-    Zip::from(&expected_positions)
-        .and(result)
-        .for_each(|&val1, &val2| assert!((val1 - val2).abs() < 1e-15));
-}
+        worldlines.set_positions(0, 0, 4, &initial_positions);
 
-#[test]
-fn test_periodic_box_distance() {
-    use ndarray::array;
+        // Reseat the polymer for particle 0
+        pbc.reseat_polymer(&mut worldlines, 0);
 
-    // Define a periodic box with lengths for each dimension.
-    let pbc = PeriodicBox::new([1.0, 2.0, 3.0]);
+        // Expected positions after reseating
+        let expected_positions = array![
+            [0.2, 0.2, 0.5],
+            [0.3, 0.1, 0.4],
+            [0.1, -0.1, 0.6],
+            [-1.0, 1.0, 0.0]
+        ];
 
-    // Test 1: Points without crossing boundaries.
-    let r1 = array![0.4, 1.1, 1.4];
-    let r2 = array![0.9, 0.1, 1.8];
-    let dist = pbc.distance(&r1, &r2);
+        // Assert that the positions match the expected values
+        let result = worldlines.positions(0, 0, 4);
+        Zip::from(&expected_positions)
+            .and(result)
+            .for_each(|&val1, &val2| assert!((val1 - val2).abs() < 1e-15));
+    }
 
-    // Expected distance calculated manually: sqrt(0.5^2 + 1.0^2 + 0.4^2) =~ 1.1874...
-    let expected = (0.5f64.powi(2) + 1.0f64.powi(2) + 0.4f64.powi(2)).sqrt();
-    assert!(
-        (dist - expected).abs() < 1e-10,
-        "Test 1 failed: distance = {:.10}",
-        dist
-    );
+    #[test]
+    fn test_periodic_box_distance() {
+        // Define a periodic box with lengths for each dimension.
+        let pbc = PeriodicBox::new([1.0, 2.0, 3.0]);
 
-    // Test 2: Points crossing boundaries (wrap-around).
-    let r3 = array![0.9, 1.9, 2.9];
-    let r4 = array![0.1, 0.1, 0.1];
-    let dist = pbc.distance(&r3, &r4);
+        // Test 1: Points without crossing boundaries.
+        let r1 = array![0.4, 1.1, 1.4];
+        let r2 = array![0.9, 0.1, 1.8];
+        let dist = pbc.distance(&r1, &r2);
 
-    // Expected distance: Nearest-image convention
-    // - For dimension 1: |0.9 - 0.1 - 1.0| = 0.2
-    // - For dimension 2: Nearest image is |1.9 - 0.1 - 2.0| = 0.2
-    // - For dimension 3: Nearest image is |2.9 - 0.1 - 3.0| = 0.2
-    let expected = (0.2f64.powi(2) + 0.2f64.powi(2) + 0.2f64.powi(2)).sqrt();
-    assert!(
-        (dist - expected).abs() < 1e-10,
-        "Test 2 failed: distance = {:.10}",
-        dist
-    );
+        // Expected distance calculated manually: sqrt(0.5^2 + 1.0^2 + 0.4^2) =~ 1.1874...
+        let expected = (0.5f64.powi(2) + 1.0f64.powi(2) + 0.4f64.powi(2)).sqrt();
+        assert!(
+            (dist - expected).abs() < 1e-10,
+            "Test 1 failed: distance = {:.10}",
+            dist
+        );
 
-    // Test 3: Identical points (distance should be zero).
-    let r5 = array![0.5, 1.0, 1.5];
-    let r6 = array![0.5, 1.0, 1.5];
-    let dist = pbc.distance(&r5, &r6);
+        // Test 2: Points crossing boundaries (wrap-around).
+        let r3 = array![0.9, 1.9, 2.9];
+        let r4 = array![0.1, 0.1, 0.1];
+        let dist = pbc.distance(&r3, &r4);
 
-    assert!(
-        (dist).abs() < 1e-10,
-        "Test 3 failed: distance = {:.10}",
-        dist
-    );
+        // Expected distance: Nearest-image convention
+        // - For dimension 1: |0.9 - 0.1 - 1.0| = 0.2
+        // - For dimension 2: Nearest image is |1.9 - 0.1 - 2.0| = 0.2
+        // - For dimension 3: Nearest image is |2.9 - 0.1 - 3.0| = 0.2
+        let expected = (0.2f64.powi(2) + 0.2f64.powi(2) + 0.2f64.powi(2)).sqrt();
+        assert!(
+            (dist - expected).abs() < 1e-10,
+            "Test 2 failed: distance = {:.10}",
+            dist
+        );
 
-    // Test 4: Periodic images of the same point (distance should be zero).
-    let r7 = array![0.5, 1.0, 1.0];
-    let r8 = array![-0.5, 5.0, -5.0];
-    let dist = pbc.distance(&r7, &r8);
+        // Test 3: Identical points (distance should be zero).
+        let r5 = array![0.5, 1.0, 1.5];
+        let r6 = array![0.5, 1.0, 1.5];
+        let dist = pbc.distance(&r5, &r6);
 
-    assert!(
-        (dist).abs() < 1e-10,
-        "Test 4 failed: distance = {:.10}",
-        dist
-    );
+        assert!(
+            (dist).abs() < 1e-10,
+            "Test 3 failed: distance = {:.10}",
+            dist
+        );
+
+        // Test 4: Periodic images of the same point (distance should be zero).
+        let r7 = array![0.5, 1.0, 1.0];
+        let r8 = array![-0.5, 5.0, -5.0];
+        let dist = pbc.distance(&r7, &r8);
+
+        assert!(
+            (dist).abs() < 1e-10,
+            "Test 4 failed: distance = {:.10}",
+            dist
+        );
+    }
 }
