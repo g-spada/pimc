@@ -1,8 +1,7 @@
 use super::sector::Sector;
-use super::traits::WorldLineDimensions;
-use super::traits::WorldLinePermutationAccess;
-use super::traits::WorldLinePositionAccess;
-use super::traits::WorldLineWormAccess;
+use super::traits::{
+    WorldLineDimensions, WorldLinePermutationAccess, WorldLinePositionAccess, WorldLineWormAccess,
+};
 use ndarray::{
     arr1, s, Array, Array1, Array2, Array3, ArrayView1, ArrayView2, ArrayViewMut1, ArrayViewMut2,
 };
