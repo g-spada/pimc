@@ -1,4 +1,4 @@
-# pimc-rs
+# pimc\_rs
 
 A Rust-based scientific computing library for Path Integral Monte Carlo (PIMC) simulations.
 
