@@ -1,3 +1,4 @@
+use super::space::Space;
 use crate::path_state::traits::{WorldLineDimensions, WorldLinePositionAccess};
 use ndarray::{Array1, ArrayView1};
 
@@ -9,26 +10,26 @@ use ndarray::{Array1, ArrayView1};
 #[derive(Debug, PartialEq)]
 pub struct PeriodicBox<const D: usize> {
     /// The lengths of the box in each spatial dimension.
-    lengths: [f64; D],
+    length: [f64; D],
 }
 
 impl<const D: usize> PeriodicBox<D> {
     /// Creates a new `PeriodicBox` instance.
     ///
     /// # Arguments
-    /// * `lengths` - A vector specifying the lengths of the box in each spatial dimension.
+    /// * `length` - A vector specifying the length of the box in each spatial dimension.
     ///
     /// # Panics
-    /// Panics if any value in `lengths` is less than or equal to zero.
+    /// Panics if any value in `length` is less than or equal to zero.
     ///
     /// # Returns
-    /// A new `PeriodicBox` instance with the specified lengths.
-    pub fn new(lengths: [f64; D]) -> Self {
+    /// A new `PeriodicBox` instance with the specified length.
+    pub fn new(length: [f64; D]) -> Self {
         assert!(
-            lengths.iter().all(|&l| l > 0.0),
+            length.iter().all(|&l| l > 0.0),
             "All box lengths must be positive."
         );
-        Self { lengths }
+        Self { length }
     }
 
     /// Computes the periodic difference between two positions.
@@ -71,7 +72,7 @@ impl<const D: usize> PeriodicBox<D> {
         let mut result = [0.0; D];
         for i in 0..r1_view.len() {
             let diff = r1_view[i] - r2_view[i];
-            result[i] = diff - self.lengths[i] * (diff / self.lengths[i]).round();
+            result[i] = diff - self.length[i] * (diff / self.length[i]).round();
         }
         result
     }
@@ -122,7 +123,7 @@ impl<const D: usize> PeriodicBox<D> {
     {
         r.into()
             .iter()
-            .zip(&self.lengths)
+            .zip(&self.length)
             .map(|(&x, &l)| x.rem_euclid(l))
             .collect()
     }
@@ -161,6 +162,40 @@ impl<const D: usize> PeriodicBox<D> {
 
         // Add the shift to each bead of the polymer
         whole_polymer += &shift.view().broadcast([W::TIME_SLICES, D]).unwrap();
+    }
+}
+
+impl<const D: usize> Space<D> for PeriodicBox<D> {
+    ///// Returns the lengths of the periodic box.
+    //fn length(&self) -> &[f64; D] {
+        //&self.length
+    //}
+
+    /// D-dimensional volume of the space
+    fn volume(&self) -> f64 {
+        let mut volume = 1.0;
+        for i in 0..D {
+            volume *= self.length[i];
+        }
+        volume
+    }
+
+    /// Computes the periodic difference between two positions.
+    fn difference<'a, A, B>(&self, r1: A, r2: B) -> [f64; D]
+    where
+        A: Into<ArrayView1<'a, f64>>,
+        B: Into<ArrayView1<'a, f64>>,
+    {
+        self.difference(r1, r2)
+    }
+
+    /// Computes the Euclidean distance between two positions under periodic boundary conditions.
+    fn distance<'a, A, B>(&self, r1: A, r2: B) -> f64
+    where
+        A: Into<ArrayView1<'a, f64>>,
+        B: Into<ArrayView1<'a, f64>>,
+    {
+        self.distance(r1, r2)
     }
 }
 
