@@ -99,8 +99,17 @@ mod tests {
             self.preceding[particle]
         }
 
+
+        fn set_preceding(&mut self, particle: usize, preceding: Option<usize>) {
+                self.preceding[particle] = preceding;
+        }
+
         fn following(&self, particle: usize) -> Option<usize> {
             self.following[particle]
+        }
+
+        fn set_following(&mut self, particle: usize, following: Option<usize>) {
+                self.following[particle] = following;
         }
     }
 

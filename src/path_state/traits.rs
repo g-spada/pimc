@@ -50,14 +50,14 @@ pub trait WorldLinePermutationAccess {
     /// Gets the index of the preceding particle in the polymer.
     fn preceding(&self, particle: usize) -> Option<usize>;
 
-    ///// Sets the index of the preceding particle in the polymer.
-    //fn set_preceding(&mut self, particle: usize, preceding: Option<usize>);
+    /// Sets the index of the preceding particle in the polymer.
+    fn set_preceding(&mut self, particle: usize, preceding: Option<usize>);
 
     /// Gets the index of the following particle in the polymer.
     fn following(&self, particle: usize) -> Option<usize>;
 
-    ///// Sets the index of the following particle in the polymer.
-    //fn set_following(&mut self, particle: usize, following: Option<usize>);
+    /// Sets the index of the following particle in the polymer.
+    fn set_following(&mut self, particle: usize, following: Option<usize>);
 }
 
 /// Trait for accessing the permutation structure of worldlines.

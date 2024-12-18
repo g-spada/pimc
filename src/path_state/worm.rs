@@ -27,7 +27,7 @@ use std::io::{self, BufReader, BufWriter};
 /// assert_eq!(position.to_vec(), vec![1.0, 2.0, 3.0]);
 /// ```
 ///
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Worm<const N: usize, const M: usize, const D: usize> {
     /// Multidimensional array with const generics dimensions
     /// (N particles, M time slices, D spatial dimensions).
@@ -621,20 +621,20 @@ impl<const N: usize, const M: usize, const D: usize> WorldLinePermutationAccess 
         self.preceding(particle)
     }
 
-    ///// Sets the index of the preceding particle in the polymer.
-    //fn set_preceding(&mut self, particle: usize, preceding: Option<usize>) {
-    //self.set_preceding(particle, preceding)
-    //}
+    /// Sets the index of the preceding particle in the polymer.
+    fn set_preceding(&mut self, particle: usize, preceding: Option<usize>) {
+        self.set_preceding(particle, preceding)
+    }
 
     /// Gets the index of the following particle in the polymer.
     fn following(&self, particle: usize) -> Option<usize> {
         self.following(particle)
     }
 
-    ///// Sets the index of the following particle in the polymer.
-    //fn set_following(&mut self, particle: usize, following: Option<usize>) {
-    //self.set_following(particle, following)
-    //}
+    /// Sets the index of the following particle in the polymer.
+    fn set_following(&mut self, particle: usize, following: Option<usize>) {
+        self.set_following(particle, following)
+    }
 }
 
 impl<const N: usize, const M: usize, const D: usize> WorldLineWormAccess for Worm<N, M, D> {

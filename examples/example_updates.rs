@@ -1,7 +1,9 @@
 use env_logger::Builder;
 use log::info;
+use ndarray::{Array1, ArrayView1};
 use pimc_rs::path_state::worm::Worm;
 use pimc_rs::updates::monte_carlo_update::MonteCarloUpdate;
+use pimc_rs::updates::open_close::OpenClose;
 use pimc_rs::updates::redraw::Redraw;
 use pimc_rs::updates::worm_translate::WormTranslate;
 
@@ -13,6 +15,10 @@ const MP1: usize = M + 1;
 
 fn two_lambda_tau(_: &Worm<N, MP1, D>, _: usize) -> f64 {
     1.0
+}
+
+fn distance(r1: ArrayView1<f64>, r2: ArrayView1<f64>) -> Array1<f64> {
+    r1.to_owned() - r2
 }
 
 fn main() {
@@ -57,4 +63,29 @@ fn main() {
             );
         }
     }
+
+    // Open/Close update
+    let mut mc_openclose = OpenClose::new(
+        M / 3,
+        M - 1,
+        0.5,
+        1.0,
+        4.0,
+        distance,
+        two_lambda_tau,
+        |_, _| 0.5,
+    );
+    let success = mc_openclose.try_update(&mut path, &mut rng);
+    if let Some(update) = success {
+        for part in update.modified_particles {
+            info!(
+                "New path for p = {}\n{:?}",
+                part,
+                path.positions(part, 0, path.time_slices())
+            );
+        }
+    }
+
+    // Print final configuration
+    info!("Worm state: {:?}", path);
 }
