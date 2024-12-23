@@ -4,4 +4,7 @@ pub mod monte_carlo_update;
 pub mod open_close;
 pub mod proposed_update;
 pub mod redraw;
+pub mod redraw_head;
+pub mod redraw_tail;
+pub mod swap;
 pub mod worm_translate;

@@ -5,6 +5,8 @@ use pimc_rs::path_state::worm::Worm;
 use pimc_rs::updates::monte_carlo_update::MonteCarloUpdate;
 use pimc_rs::updates::open_close::OpenClose;
 use pimc_rs::updates::redraw::Redraw;
+use pimc_rs::updates::redraw_head::RedrawHead;
+use pimc_rs::updates::redraw_tail::RedrawTail;
 use pimc_rs::updates::worm_translate::WormTranslate;
 
 const N: usize = 3;
@@ -14,7 +16,7 @@ const D: usize = 2;
 const MP1: usize = M + 1;
 
 fn two_lambda_tau(_: &Worm<N, MP1, D>, _: usize) -> f64 {
-    1.0
+    0.1
 }
 
 fn distance(r1: ArrayView1<f64>, r2: ArrayView1<f64>) -> Array1<f64> {
@@ -32,60 +34,103 @@ fn main() {
     path.set_following(0, Some(2));
     path.set_preceding(2, Some(0));
     path.set_following(2, None);
-    info!("Head is {:?}", path.worm_head());
-    info!("Tail is {:?}", path.worm_tail());
-    info!("Sector is {:?}", path.sector());
 
-    // Translate update
-    let mut mc_transl = WormTranslate::new([1.0, 2.0], |_, _| 0.5);
-    let mut rng = rand::thread_rng();
+    for _ in 0..3 {
+        info!("Head is {:?}", path.worm_head());
+        info!("Tail is {:?}", path.worm_tail());
+        info!("Sector is {:?}", path.sector());
 
-    let success = mc_transl.try_update(&mut path, &mut rng);
-    if let Some(update) = success {
-        for part in update.modified_particles {
-            info!(
-                "New path for p = {}\n{:?}",
-                part,
-                path.positions(part, 0, path.time_slices())
-            );
+        // Translate update
+        let mut mc_transl = WormTranslate::new([1.0, 2.0], |_, _| 0.5);
+        let mut rng = rand::thread_rng();
+
+        let success = mc_transl.try_update(&mut path, &mut rng);
+        if let Some(update) = success {
+            for part in update.modified_particles {
+                info!(
+                    "New path for p = {}\n{:?}",
+                    part,
+                    path.positions(part, 0, path.time_slices())
+                );
+            }
+        }
+
+        // Redraw update
+        let mut mc_redraw = Redraw::new(M / 3, M - 1, two_lambda_tau, |_, _| 0.5);
+        let success = mc_redraw.try_update(&mut path, &mut rng);
+        if let Some(update) = success {
+            for part in update.modified_particles {
+                info!(
+                    "New path for p = {}\n{:?}",
+                    part,
+                    path.positions(part, 0, path.time_slices())
+                );
+            }
+        }
+
+        // RedrawHead update
+        let mut mc_redrawhead = RedrawHead::new(M / 3, M - 1, two_lambda_tau, |_, _| 0.5);
+        let success = mc_redrawhead.try_update(&mut path, &mut rng);
+        if let Some(update) = success {
+            for part in update.modified_particles {
+                info!(
+                    "New path for p = {}\n{:?}",
+                    part,
+                    path.positions(part, 0, path.time_slices())
+                );
+            }
+        }
+
+        // RedrawTail update
+        let mut mc_redrawtail = RedrawTail::new(M / 3, M - 1, two_lambda_tau, |_, _| 0.5);
+        let success = mc_redrawtail.try_update(&mut path, &mut rng);
+        if let Some(update) = success {
+            for part in update.modified_particles {
+                info!(
+                    "New path for p = {}\n{:?}",
+                    part,
+                    path.positions(part, 0, path.time_slices())
+                );
+            }
+        }
+
+        // Open/Close update
+        let mut mc_openclose = OpenClose::new(
+            M / 3,
+            M - 1,
+            0.5,
+            1.0,
+            4.0,
+            distance,
+            two_lambda_tau,
+            |_, _| 0.5,
+        );
+        let success = mc_openclose.try_update(&mut path, &mut rng);
+        if let Some(update) = success {
+            for part in update.modified_particles {
+                info!(
+                    "New path for p = {}\n{:?}",
+                    part,
+                    path.positions(part, 0, path.time_slices())
+                );
+            }
+        }
+
+        // Print final configuration
+        info!("Worm state: {:?}", path);
+
+        // Check permutations
+        for particle in 0..N {
+            if let Some(next) = path.following(particle) {
+                let diff = path.position(particle, M).to_owned() - path.position(next, 0);
+                assert!(
+                    diff.iter().any(|&l| l.abs() < 1e-10),
+                    "Particles {} and {} not correctly glued together: difference is {:}",
+                    particle,
+                    next,
+                    diff
+                )
+            }
         }
     }
-
-    // Redraw update
-    let mut mc_redraw = Redraw::new(M / 3, M - 1, two_lambda_tau, |_, _| 0.5);
-    let success = mc_redraw.try_update(&mut path, &mut rng);
-    if let Some(update) = success {
-        for part in update.modified_particles {
-            info!(
-                "New path for p = {}\n{:?}",
-                part,
-                path.positions(part, 0, path.time_slices())
-            );
-        }
-    }
-
-    // Open/Close update
-    let mut mc_openclose = OpenClose::new(
-        M / 3,
-        M - 1,
-        0.5,
-        1.0,
-        4.0,
-        distance,
-        two_lambda_tau,
-        |_, _| 0.5,
-    );
-    let success = mc_openclose.try_update(&mut path, &mut rng);
-    if let Some(update) = success {
-        for part in update.modified_particles {
-            info!(
-                "New path for p = {}\n{:?}",
-                part,
-                path.positions(part, 0, path.time_slices())
-            );
-        }
-    }
-
-    // Print final configuration
-    info!("Worm state: {:?}", path);
 }

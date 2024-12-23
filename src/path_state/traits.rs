@@ -45,6 +45,10 @@ pub trait WorldLinePositionAccess {
     );
 }
 
+pub trait WorldLineBatchPositions {
+    fn positions_at_time_slice(&self, time_slice: usize) -> ArrayView2<f64>;
+}
+
 /// Trait for accessing the permutation structure of worldlines.
 pub trait WorldLinePermutationAccess {
     /// Gets the index of the preceding particle in the polymer.

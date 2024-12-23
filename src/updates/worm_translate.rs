@@ -86,7 +86,7 @@ where
                 .broadcast([W::TIME_SLICES, D])
                 .unwrap()
                 .to_owned()
-                + worldlines.positions(p0, 0, W::TIME_SLICES);
+                + worldlines.positions(p, 0, W::TIME_SLICES);
             debug_assert_eq!(
                 new_positions.shape()[0],
                 W::TIME_SLICES,

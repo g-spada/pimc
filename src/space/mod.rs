@@ -1,3 +1,3 @@
 pub mod free_space;
 pub mod periodic_box;
-pub mod space;
+pub mod traits;

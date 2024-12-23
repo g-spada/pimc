@@ -54,7 +54,11 @@ use ndarray::{Array1, Array2, ArrayView1};
 ///
 pub struct OpenClose<F, W>
 where
-    W: WorldLineDimensions,
+    F: Fn(&W, &ProposedUpdate<f64>) -> f64 + Send + Sync + 'static,
+    W: WorldLineDimensions
+        + WorldLinePositionAccess
+        + WorldLinePermutationAccess
+        + WorldLineWormAccess,
 {
     min_delta_t: usize,
     max_delta_t: usize,
@@ -274,7 +278,7 @@ where
         // Set the final (redundancy) bead to the correct image of the tail
         redraw_segment
             .row_mut(delta_t)
-            .assign(&(tail_head_distance + worldlines.position(tail, 0)));
+            .assign(&( tail_head_distance + head_position));
 
         // Compute the old free-propagator weight
         let mut square_distance = 0.0;
@@ -366,9 +370,9 @@ where
             if worldlines.sector() == Sector::G {
                 // Already open
                 debug!("Already open. Nothing to update.");
-                return None;
+                None
             } else {
-                return self.open_polymer(worldlines, rng);
+                self.open_polymer(worldlines, rng)
             }
         } else {
             // Try to close
@@ -376,9 +380,9 @@ where
             if worldlines.sector() == Sector::Z {
                 // Already closed
                 debug!("Already closed. Nothing to update.");
-                return None;
+                None
             } else {
-                return self.close_polymer(worldlines, rng);
+                self.close_polymer(worldlines, rng)
             }
         }
     }

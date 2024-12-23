@@ -1,4 +1,4 @@
-use super::space::Space;
+use super::traits::Space;
 use crate::path_state::traits::{WorldLineDimensions, WorldLinePositionAccess};
 use ndarray::{Array1, ArrayView1};
 
