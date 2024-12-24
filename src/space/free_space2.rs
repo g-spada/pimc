@@ -6,6 +6,11 @@ pub struct FreeSpace<const D: usize>;
 impl<const D: usize> Space2 for FreeSpace<D> {
     const SPATIAL_DIMENSIONS: usize = D;
 
+    fn volume(&self) -> f64 {
+        // FOR TEST PURPOSES ONLY
+        1.0
+    }
+
     fn difference<'a, A, B>(&self, r1: A, r2: B) -> Array1<f64>
     where
         A: Into<ArrayView1<'a, f64>>,

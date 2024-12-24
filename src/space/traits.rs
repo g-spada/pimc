@@ -41,6 +41,9 @@ pub trait Space<const D: usize> {
 pub trait Space2 {
     const SPATIAL_DIMENSIONS: usize;
 
+    /// D-dimensional volume of the space
+    fn volume(&self) -> f64;
+
     /// Compute the vector difference between two points.
     fn difference<'a, A, B>(&self, r1: A, r2: B) -> Array1<f64>
     where

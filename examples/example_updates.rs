@@ -1,6 +1,6 @@
 use env_logger::Builder;
 use log::info;
-use ndarray::{Array1, ArrayView1};
+//use ndarray::{Array1, ArrayView1};
 use pimc_rs::path_state::worm::Worm;
 use pimc_rs::space::free_space2::FreeSpace;
 use pimc_rs::updates::monte_carlo_update::MonteCarloUpdate;
@@ -21,10 +21,6 @@ fn two_lambda_tau(_: &Worm<N, MP1, D>, _: usize) -> f64 {
     0.1
 }
 
-fn distance(r1: ArrayView1<f64>, r2: ArrayView1<f64>) -> Array1<f64> {
-    r1.to_owned() - r2
-}
-
 fn main() {
     // Programmatically set the logging level to TRACE
     Builder::new().filter_level(log::LevelFilter::Trace).init();
@@ -36,12 +32,15 @@ fn main() {
     path.set_following(0, Some(2));
     path.set_preceding(2, Some(0));
     path.set_following(2, None);
-    
+
     // Print starting configuration
     info!("Starting configuration:\n{:?}", path);
 
     // RNG
     let mut rng = rand::thread_rng();
+
+    // Space object
+    let flatlandia = FreeSpace::<D>;
 
     // Translate update
     let mut mc_transl = WormTranslate::new([1.0, 2.0], |_, _| 0.5);
@@ -61,14 +60,10 @@ fn main() {
         M - 1,
         0.5,
         1.0,
-        4.0,
-        distance,
+        &flatlandia,
         two_lambda_tau,
         |_, _| 0.5,
     );
-
-    // Space object
-    let flatlandia = FreeSpace::<D>;
 
     // Swap update
     let mut mc_swap = Swap::new(M / 3, M - 1, two_lambda_tau, |_, _| 0.5, &flatlandia);

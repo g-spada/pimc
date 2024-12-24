@@ -6,8 +6,9 @@ use crate::path_state::sector::Sector;
 use crate::path_state::traits::{
     WorldLineDimensions, WorldLinePermutationAccess, WorldLinePositionAccess, WorldLineWormAccess,
 };
+use crate::space::traits::Space2;
 use log::{debug, trace};
-use ndarray::{Array1, Array2, ArrayView1};
+use ndarray::Array2;
 
 /// A Monte Carlo update that opens/closes polymer cycles.
 ///
@@ -52,8 +53,9 @@ use ndarray::{Array1, Array2, ArrayView1};
 /// - `levy_staging`: The algorithm used for sampling the redrawn segment.
 /// - `ProposedUpdate`: Used to manage and track the modifications made during the update.
 ///
-pub struct OpenClose<F, W>
+pub struct OpenClose<'a, S, F, W>
 where
+    S: Space2,
     F: Fn(&W, &ProposedUpdate<f64>) -> f64 + Send + Sync + 'static,
     W: WorldLineDimensions
         + WorldLinePositionAccess
@@ -64,16 +66,16 @@ where
     max_delta_t: usize,
     open_close_constant: f64,
     max_head_displacement: f64,
-    space_volume: f64,
-    distance: fn(ArrayView1<f64>, ArrayView1<f64>) -> Array1<f64>,
+    space: &'a S,
     two_lambda_tau: fn(&W, p: usize) -> f64,
     weight_function: F,
     accept_count: usize,
     reject_count: usize,
 }
 
-impl<F, W> OpenClose<F, W>
+impl<'a, S, F, W> OpenClose<'a, S, F, W>
 where
+    S: Space2,
     F: Fn(&W, &ProposedUpdate<f64>) -> f64 + Send + Sync + 'static,
     W: WorldLineDimensions
         + WorldLinePositionAccess
@@ -85,8 +87,7 @@ where
         max_delta_t: usize,
         open_close_constant: f64,
         max_head_displacement: f64,
-        space_volume: f64,
-        distance: fn(ArrayView1<f64>, ArrayView1<f64>) -> Array1<f64>,
+        space: &'a S,
         two_lambda_tau: fn(w: &W, _: usize) -> f64,
         weight_function: F,
     ) -> Self {
@@ -104,8 +105,7 @@ where
             max_delta_t,
             open_close_constant,
             max_head_displacement,
-            space_volume,
-            distance,
+            space,
             two_lambda_tau,
             weight_function,
             accept_count: 0,
@@ -174,7 +174,7 @@ where
         }
         let rho_free_new = (-square_distance / (2.0 * two_lambda_tau * delta_t as f64)).exp();
 
-        let weight_open = self.open_close_constant * tot_particles as f64 / self.space_volume
+        let weight_open = self.open_close_constant * tot_particles as f64 / self.space.volume()
             * (2.0 * displacement_bound).powi(W::SPATIAL_DIMENSIONS as i32)
             * rho_free_new
             / rho_free_old;
@@ -252,7 +252,7 @@ where
             self.max_head_displacement,
         );
 
-        let tail_head_distance = (self.distance)(tail_position, head_position);
+        let tail_head_distance = self.space.difference(tail_position, head_position);
         if tail_head_distance
             .iter()
             .any(|&l| l.abs() > displacement_bound)
@@ -278,7 +278,7 @@ where
         // Set the final (redundancy) bead to the correct image of the tail
         redraw_segment
             .row_mut(delta_t)
-            .assign(&( tail_head_distance + head_position));
+            .assign(&(tail_head_distance + head_position));
 
         // Compute the old free-propagator weight
         let mut square_distance = 0.0;
@@ -297,7 +297,7 @@ where
         let rho_free_new = (-square_distance / (2.0 * two_lambda_tau * delta_t as f64)).exp();
 
         // Compute the prefactor for the acceptance probability
-        let weight_close = self.space_volume
+        let weight_close = self.space.volume()
             / (self.open_close_constant
                 * tot_particles as f64
                 * (2.0 * displacement_bound).powi(W::SPATIAL_DIMENSIONS as i32))
@@ -351,8 +351,9 @@ where
     }
 }
 
-impl<F, W> MonteCarloUpdate<W> for OpenClose<F, W>
+impl<'a, S, F, W> MonteCarloUpdate<W> for OpenClose<'a, S, F, W>
 where
+    S: Space2,
     F: Fn(&W, &ProposedUpdate<f64>) -> f64 + Send + Sync + 'static,
     W: WorldLineDimensions
         + WorldLinePositionAccess
