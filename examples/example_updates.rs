@@ -2,11 +2,14 @@ use env_logger::Builder;
 use log::info;
 use ndarray::{Array1, ArrayView1};
 use pimc_rs::path_state::worm::Worm;
+use pimc_rs::space::free_space2::FreeSpace;
 use pimc_rs::updates::monte_carlo_update::MonteCarloUpdate;
 use pimc_rs::updates::open_close::OpenClose;
+use pimc_rs::updates::proposed_update::ProposedUpdate;
 use pimc_rs::updates::redraw::Redraw;
 use pimc_rs::updates::redraw_head::RedrawHead;
 use pimc_rs::updates::redraw_tail::RedrawTail;
+use pimc_rs::updates::swap::Swap;
 use pimc_rs::updates::worm_translate::WormTranslate;
 
 const N: usize = 3;
@@ -34,15 +37,46 @@ fn main() {
     path.set_following(0, Some(2));
     path.set_preceding(2, Some(0));
     path.set_following(2, None);
+    
+    // Print starting configuration
+    info!("Starting configuration:\n{:?}", path);
 
-    for _ in 0..3 {
-        info!("Head is {:?}", path.worm_head());
-        info!("Tail is {:?}", path.worm_tail());
-        info!("Sector is {:?}", path.sector());
+    // RNG
+    let mut rng = rand::thread_rng();
 
-        // Translate update
-        let mut mc_transl = WormTranslate::new([1.0, 2.0], |_, _| 0.5);
-        let mut rng = rand::thread_rng();
+    // Translate update
+    let mut mc_transl = WormTranslate::new([1.0, 2.0], |_, _| 0.5);
+
+    // Redraw update
+    let mut mc_redraw = Redraw::new(M / 3, M - 1, two_lambda_tau, |_, _| 0.5);
+
+    // RedrawHead update
+    let mut mc_redrawhead = RedrawHead::new(M / 3, M - 1, two_lambda_tau, |_, _| 0.5);
+
+    // RedrawTail update
+    let mut mc_redrawtail = RedrawTail::new(M / 3, M - 1, two_lambda_tau, |_, _| 0.5);
+
+    // Open/Close update
+    let mut mc_openclose = OpenClose::new(
+        M / 3,
+        M - 1,
+        0.5,
+        1.0,
+        4.0,
+        distance,
+        two_lambda_tau,
+        |_, _| 0.5,
+    );
+
+    // Space object
+    let flatlandia = FreeSpace::<D>;
+
+    // Swap update
+    let mut mc_swap = Swap::new(M / 3, M - 1, two_lambda_tau, |_, _| 0.5, &flatlandia);
+
+    for mc_it in 0..10 {
+        info!("######################################");
+        info!("# ITERATION {}", mc_it);
 
         let success = mc_transl.try_update(&mut path, &mut rng);
         if let Some(update) = success {
@@ -55,8 +89,6 @@ fn main() {
             }
         }
 
-        // Redraw update
-        let mut mc_redraw = Redraw::new(M / 3, M - 1, two_lambda_tau, |_, _| 0.5);
         let success = mc_redraw.try_update(&mut path, &mut rng);
         if let Some(update) = success {
             for part in update.modified_particles {
@@ -68,8 +100,6 @@ fn main() {
             }
         }
 
-        // RedrawHead update
-        let mut mc_redrawhead = RedrawHead::new(M / 3, M - 1, two_lambda_tau, |_, _| 0.5);
         let success = mc_redrawhead.try_update(&mut path, &mut rng);
         if let Some(update) = success {
             for part in update.modified_particles {
@@ -81,8 +111,6 @@ fn main() {
             }
         }
 
-        // RedrawTail update
-        let mut mc_redrawtail = RedrawTail::new(M / 3, M - 1, two_lambda_tau, |_, _| 0.5);
         let success = mc_redrawtail.try_update(&mut path, &mut rng);
         if let Some(update) = success {
             for part in update.modified_particles {
@@ -94,17 +122,6 @@ fn main() {
             }
         }
 
-        // Open/Close update
-        let mut mc_openclose = OpenClose::new(
-            M / 3,
-            M - 1,
-            0.5,
-            1.0,
-            4.0,
-            distance,
-            two_lambda_tau,
-            |_, _| 0.5,
-        );
         let success = mc_openclose.try_update(&mut path, &mut rng);
         if let Some(update) = success {
             for part in update.modified_particles {
@@ -116,8 +133,23 @@ fn main() {
             }
         }
 
-        // Print final configuration
-        info!("Worm state: {:?}", path);
+        let success = mc_swap.try_update(&mut path, &mut rng);
+        if let Some(update) = success {
+            for part in update.modified_particles {
+                info!(
+                    "New path for p = {}\n{:?}",
+                    part,
+                    path.positions(part, 0, path.time_slices())
+                );
+            }
+        }
+
+        let flatlandia = FreeSpace::<2>;
+        // Print configuration
+        info!("Current configuration:\n{:?}", path);
+        info!("Head is {:?}", path.worm_head());
+        info!("Tail is {:?}", path.worm_tail());
+        info!("Sector is {:?}", path.sector());
 
         // Check permutations
         for particle in 0..N {

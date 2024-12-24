@@ -58,13 +58,52 @@ pub struct Swap<'a, S: Space2, F, W> {
     /// This function takes the current state of the worldlines and the proposed update as input.
     weight_function: F,
 
+    /// The underlying space
+    space: &'a S,
+
     /// Tracks the number of updates that have been accepted.
     accept_count: usize,
 
     /// Tracks the number of updates that have been rejected.
     reject_count: usize,
+}
 
-    space: &'a S,
+impl<'a, S, F, W> Swap<'a, S, F, W>
+where
+    S: Space2,
+    F: Fn(&W, &ProposedUpdate<f64>) -> f64 + Send + Sync + 'static,
+    W: WorldLineDimensions
+        + WorldLinePositionAccess
+        + WorldLineWormAccess
+        + WorldLinePermutationAccess
+        + WorldLineBatchPositions,
+{
+    pub fn new(
+        min_delta_t: usize,
+        max_delta_t: usize,
+        two_lambda_tau: fn(w: &W, _: usize) -> f64,
+        weight_function: F,
+        space: &'a S,
+    ) -> Self {
+        assert!(min_delta_t > 1, "`min_delta_t` must be greater than 1.");
+        assert!(
+            min_delta_t <= max_delta_t,
+            "`min_delta_t`cannot be greater than `max_delta_t`"
+        );
+        assert!(
+            max_delta_t < W::TIME_SLICES,
+            "max_delta_t cannot be greater than W::TIME_SLICES -1"
+        );
+        Self {
+            min_delta_t,
+            max_delta_t,
+            two_lambda_tau,
+            weight_function,
+            space,
+            accept_count: 0,
+            reject_count: 0,
+        }
+    }
 }
 
 impl<'a, S, F, W> MonteCarloUpdate<W> for Swap<'a, S, F, W>
@@ -109,6 +148,7 @@ where
             worldlines.positions_at_time_slice(t0),
             worldlines.position(tail, 0),
         );
+        trace!("Distances at pivot slice T{}:\n{:?}", t0, nearest_images);
 
         // Compute the weights
         let mut weights: Array1<f64> = nearest_images
@@ -120,6 +160,7 @@ where
             })
             .collect();
         weights[head] = 0.0;
+        trace!("Weights: {:?}", weights);
         let sum_weights = weights.sum();
 
         // Select the particle by tower sampling from the discrete probability distribution given by
@@ -154,7 +195,7 @@ where
         // Final bead: glue to previous tail
         redraw_segment
             .row_mut(delta_t)
-            .assign(&(&worldlines.position(p0, W::TIME_SLICES - 1) - &nearest_images.row(p0)));
+            .assign(&(&worldlines.position(p0, t0) - &nearest_images.row(p0)));
 
         // We now redraw the segment t0..W::TIME_SLICES with levy
         if delta_t > 1 {
@@ -189,10 +230,16 @@ where
             debug!("Move accepted");
 
             // Update the permutations
+            let broken_link = worldlines.following(p0).unwrap(); // Can not fail: p0 is not head
             worldlines.set_following(p0, Some(tail));
             worldlines.set_preceding(tail, Some(p0));
-            worldlines.set_preceding(p0, None);
-            debug_assert!( worldlines.worm_tail() == Some(p0), "New value of tail must be registered." );
+            worldlines.set_preceding(broken_link, None);
+            debug_assert!(
+                worldlines.worm_tail() == Some(broken_link),
+                "Expected new tail {}, found {}",
+                broken_link,
+                worldlines.worm_tail().unwrap()
+            );
 
             Some(proposal.to_accepted_update())
         } else {

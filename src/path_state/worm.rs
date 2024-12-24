@@ -1,6 +1,7 @@
 use super::sector::Sector;
 use super::traits::{
-    WorldLineDimensions, WorldLinePermutationAccess, WorldLinePositionAccess, WorldLineWormAccess,
+    WorldLineBatchPositions, WorldLineDimensions, WorldLinePermutationAccess,
+    WorldLinePositionAccess, WorldLineWormAccess,
 };
 use ndarray::{
     arr1, s, Array, Array1, Array2, Array3, ArrayView1, ArrayView2, ArrayViewMut1, ArrayViewMut2,
@@ -651,6 +652,22 @@ impl<const N: usize, const M: usize, const D: usize> WorldLineWormAccess for Wor
     /// Gets the sector of the worldlines.
     fn sector(&self) -> Sector {
         self.sector()
+    }
+}
+
+impl<const N: usize, const M: usize, const D: usize> WorldLineBatchPositions for Worm<N, M, D> {
+    /// Returns a 2D view of the positions of all particles at a specific time slice.
+    fn positions_at_time_slice(&self, time_slice: usize) -> ArrayView2<f64> {
+        // Validate the time slice index
+        debug_assert!(
+            time_slice < M,
+            "Time slice index out of bounds: time_slice={}, max allowed={}",
+            time_slice,
+            M - 1
+        );
+
+        // Slice and return the positions of all particles at the given time slice
+        self.positions.slice(s![.., time_slice, ..])
     }
 }
 
