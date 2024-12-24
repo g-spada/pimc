@@ -5,7 +5,6 @@ use pimc_rs::path_state::worm::Worm;
 use pimc_rs::space::free_space2::FreeSpace;
 use pimc_rs::updates::monte_carlo_update::MonteCarloUpdate;
 use pimc_rs::updates::open_close::OpenClose;
-use pimc_rs::updates::proposed_update::ProposedUpdate;
 use pimc_rs::updates::redraw::Redraw;
 use pimc_rs::updates::redraw_head::RedrawHead;
 use pimc_rs::updates::redraw_tail::RedrawTail;
@@ -144,7 +143,6 @@ fn main() {
             }
         }
 
-        let flatlandia = FreeSpace::<2>;
         // Print configuration
         info!("Current configuration:\n{:?}", path);
         info!("Head is {:?}", path.worm_head());
