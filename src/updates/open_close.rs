@@ -351,7 +351,7 @@ where
     }
 }
 
-impl<'a, S, F, W> MonteCarloUpdate<W> for OpenClose<'a, S, F, W>
+impl<S, F, W> MonteCarloUpdate<W> for OpenClose<'_, S, F, W>
 where
     S: Space2,
     F: Fn(&W, &ProposedUpdate<f64>) -> f64 + Send + Sync + 'static,

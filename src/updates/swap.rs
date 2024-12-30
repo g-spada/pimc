@@ -106,7 +106,7 @@ where
     }
 }
 
-impl<'a, S, F, W> MonteCarloUpdate<W> for Swap<'a, S, F, W>
+impl<S, F, W> MonteCarloUpdate<W> for Swap<'_, S, F, W>
 where
     S: Space2,
     F: Fn(&W, &ProposedUpdate<f64>) -> f64 + Send + Sync + 'static,
