@@ -165,40 +165,6 @@ impl<const D: usize> PeriodicBox<D> {
     }
 }
 
-//impl<const D: usize> Space<D> for PeriodicBox<D> {
-    /////// Returns the lengths of the periodic box.
-    ////fn length(&self) -> &[f64; D] {
-    ////&self.length
-    ////}
-
-    ///// D-dimensional volume of the space
-    //fn volume(&self) -> f64 {
-        //let mut volume = 1.0;
-        //for i in 0..D {
-            //volume *= self.length[i];
-        //}
-        //volume
-    //}
-
-    ///// Computes the periodic difference between two positions.
-    //fn difference<'a, A, B>(&self, r1: A, r2: B) -> [f64; D]
-    //where
-        //A: Into<ArrayView1<'a, f64>>,
-        //B: Into<ArrayView1<'a, f64>>,
-    //{
-        //self.difference(r1, r2)
-    //}
-
-    ///// Computes the Euclidean distance between two positions under periodic boundary conditions.
-    //fn distance<'a, A, B>(&self, r1: A, r2: B) -> f64
-    //where
-        //A: Into<ArrayView1<'a, f64>>,
-        //B: Into<ArrayView1<'a, f64>>,
-    //{
-        //self.distance(r1, r2)
-    //}
-//}
-
 impl<const D: usize> Space for PeriodicBox<D> {
     const SPATIAL_DIMENSIONS: usize = D;
 
