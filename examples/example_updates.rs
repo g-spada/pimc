@@ -2,7 +2,7 @@ use env_logger::Builder;
 use log::info;
 //use ndarray::{Array1, ArrayView1};
 use pimc_rs::path_state::worm::Worm;
-use pimc_rs::space::free_space2::FreeSpace;
+use pimc_rs::space::free_space::FreeSpace;
 use pimc_rs::updates::monte_carlo_update::MonteCarloUpdate;
 use pimc_rs::updates::open_close::OpenClose;
 use pimc_rs::updates::redraw::Redraw;

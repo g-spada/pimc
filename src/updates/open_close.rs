@@ -6,7 +6,7 @@ use crate::path_state::sector::Sector;
 use crate::path_state::traits::{
     WorldLineDimensions, WorldLinePermutationAccess, WorldLinePositionAccess, WorldLineWormAccess,
 };
-use crate::space::traits::Space2;
+use crate::space::traits::Space;
 use log::{debug, trace};
 use ndarray::Array2;
 
@@ -55,7 +55,7 @@ use ndarray::Array2;
 ///
 pub struct OpenClose<'a, S, F, W>
 where
-    S: Space2,
+    S: Space,
     F: Fn(&W, &ProposedUpdate<f64>) -> f64 + Send + Sync + 'static,
     W: WorldLineDimensions
         + WorldLinePositionAccess
@@ -75,7 +75,7 @@ where
 
 impl<'a, S, F, W> OpenClose<'a, S, F, W>
 where
-    S: Space2,
+    S: Space,
     F: Fn(&W, &ProposedUpdate<f64>) -> f64 + Send + Sync + 'static,
     W: WorldLineDimensions
         + WorldLinePositionAccess
@@ -353,7 +353,7 @@ where
 
 impl<S, F, W> MonteCarloUpdate<W> for OpenClose<'_, S, F, W>
 where
-    S: Space2,
+    S: Space,
     F: Fn(&W, &ProposedUpdate<f64>) -> f64 + Send + Sync + 'static,
     W: WorldLineDimensions
         + WorldLinePositionAccess

@@ -9,7 +9,7 @@ use crate::path_state::traits::{
 use log::{debug, trace};
 use ndarray::{Array1, Array2};
 //use ndarray::linalg::norm_l2;
-use crate::space::traits::Space2;
+use crate::space::traits::Space;
 use rand::distributions::WeightedIndex;
 use rand_distr::Distribution;
 
@@ -41,7 +41,7 @@ use rand_distr::Distribution;
 /// - `levy_staging`: The algorithm used for sampling the redrawn segment.
 /// - `ProposedUpdate`: Used to manage and track the modifications made during the update.
 ///
-pub struct Swap<'a, S: Space2, F, W> {
+pub struct Swap<'a, S: Space, F, W> {
     /// The minimum extent of the segment to redraw, in time slices.
     /// Must be greater than 1.
     min_delta_t: usize,
@@ -70,7 +70,7 @@ pub struct Swap<'a, S: Space2, F, W> {
 
 impl<'a, S, F, W> Swap<'a, S, F, W>
 where
-    S: Space2,
+    S: Space,
     F: Fn(&W, &ProposedUpdate<f64>) -> f64 + Send + Sync + 'static,
     W: WorldLineDimensions
         + WorldLinePositionAccess
@@ -108,7 +108,7 @@ where
 
 impl<S, F, W> MonteCarloUpdate<W> for Swap<'_, S, F, W>
 where
-    S: Space2,
+    S: Space,
     F: Fn(&W, &ProposedUpdate<f64>) -> f64 + Send + Sync + 'static,
     W: WorldLineDimensions
         + WorldLinePositionAccess

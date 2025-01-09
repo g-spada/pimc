@@ -1,6 +1,6 @@
 use super::traits::Space;
 use crate::path_state::traits::{WorldLineDimensions, WorldLinePositionAccess};
-use ndarray::{Array1, ArrayView1};
+use ndarray::{Array1, Array2, ArrayView1, ArrayView2};
 
 /// A struct to represent a box with periodic boundary conditions.
 ///
@@ -165,11 +165,42 @@ impl<const D: usize> PeriodicBox<D> {
     }
 }
 
-impl<const D: usize> Space<D> for PeriodicBox<D> {
-    ///// Returns the lengths of the periodic box.
-    //fn length(&self) -> &[f64; D] {
-        //&self.length
+//impl<const D: usize> Space<D> for PeriodicBox<D> {
+    /////// Returns the lengths of the periodic box.
+    ////fn length(&self) -> &[f64; D] {
+    ////&self.length
+    ////}
+
+    ///// D-dimensional volume of the space
+    //fn volume(&self) -> f64 {
+        //let mut volume = 1.0;
+        //for i in 0..D {
+            //volume *= self.length[i];
+        //}
+        //volume
     //}
+
+    ///// Computes the periodic difference between two positions.
+    //fn difference<'a, A, B>(&self, r1: A, r2: B) -> [f64; D]
+    //where
+        //A: Into<ArrayView1<'a, f64>>,
+        //B: Into<ArrayView1<'a, f64>>,
+    //{
+        //self.difference(r1, r2)
+    //}
+
+    ///// Computes the Euclidean distance between two positions under periodic boundary conditions.
+    //fn distance<'a, A, B>(&self, r1: A, r2: B) -> f64
+    //where
+        //A: Into<ArrayView1<'a, f64>>,
+        //B: Into<ArrayView1<'a, f64>>,
+    //{
+        //self.distance(r1, r2)
+    //}
+//}
+
+impl<const D: usize> Space for PeriodicBox<D> {
+    const SPATIAL_DIMENSIONS: usize = D;
 
     /// D-dimensional volume of the space
     fn volume(&self) -> f64 {
@@ -180,22 +211,117 @@ impl<const D: usize> Space<D> for PeriodicBox<D> {
         volume
     }
 
-    /// Computes the periodic difference between two positions.
-    fn difference<'a, A, B>(&self, r1: A, r2: B) -> [f64; D]
+    /// Compute the vector difference between two points.
+    fn difference<'a, A, B>(&self, r1: A, r2: B) -> Array1<f64>
     where
         A: Into<ArrayView1<'a, f64>>,
         B: Into<ArrayView1<'a, f64>>,
     {
-        self.difference(r1, r2)
+        let r1_view = r1.into();
+        let r2_view = r2.into();
+        //(&r1_view - &r2_view).iter().zip(self.length.iter()).map(|(r,l)| r - l * (r/l).round()).collect()
+        debug_assert_eq!(
+            r1_view.len(),
+            D,
+            "Input arrays must have the correct dimensionality."
+        );
+        debug_assert_eq!(
+            r2_view.len(),
+            D,
+            "Input arrays must have the correct dimensionality."
+        );
+
+        r1_view
+            .iter()
+            .zip(r2_view.iter())
+            .zip(self.length.iter())
+            .map(|((r1, r2), l)| {
+                let diff = r1 - r2;
+                diff - l * (diff / l).round()
+            })
+            .collect()
     }
 
-    /// Computes the Euclidean distance between two positions under periodic boundary conditions.
+    fn differences_from_reference<'a, A, B>(&self, r1: A, r2: B) -> Array2<f64>
+    where
+        A: Into<ArrayView2<'a, f64>>,
+        B: Into<ArrayView1<'a, f64>>,
+    {
+        let r1_view = r1.into();
+        let r2_view = r2.into();
+
+        debug_assert_eq!(
+            r1_view.shape()[1],
+            D,
+            "Each row of r1 must have the correct dimensionality."
+        );
+        debug_assert_eq!(
+            r2_view.len(),
+            D,
+            "Reference vector must have the correct dimensionality."
+        );
+
+        let mut result = Array2::zeros(r1_view.dim());
+
+        for (mut row, point) in result.outer_iter_mut().zip(r1_view.outer_iter()) {
+            for i in 0..D {
+                let diff = point[i] - r2_view[i];
+                row[i] = diff - self.length[i] * (diff / self.length[i]).round();
+            }
+        }
+
+        result
+    }
+
     fn distance<'a, A, B>(&self, r1: A, r2: B) -> f64
     where
         A: Into<ArrayView1<'a, f64>>,
         B: Into<ArrayView1<'a, f64>>,
     {
-        self.distance(r1, r2)
+        let r1_view = r1.into();
+        let r2_view = r2.into();
+        //(&r1_view - &r2_view).iter().zip(self.length.iter()).map(|(r,l)| r - l * (r/l).round()).collect()
+        debug_assert_eq!(
+            r1_view.len(),
+            D,
+            "Input arrays must have the correct dimensionality."
+        );
+        debug_assert_eq!(
+            r2_view.len(),
+            D,
+            "Input arrays must have the correct dimensionality."
+        );
+
+        let diff: Array1<f64> = r1_view
+            .iter()
+            .zip(r2_view.iter())
+            .zip(self.length.iter())
+            .map(|((r1, r2), l)| {
+                let diff = r1 - r2;
+                diff - l * (diff / l).round()
+            })
+            .collect();
+
+        diff.mapv(|x| x * x).sum().sqrt()
+    }
+
+    fn base_image<'a, A>(&self, r: A) -> Array1<f64>
+    where
+        A: Into<ArrayView1<'a, f64>>,
+    {
+        let r_view = r.into();
+
+        debug_assert_eq!(
+            r_view.len(),
+            D,
+            "Input vector must have the correct dimensionality."
+        );
+
+        r_view
+            .iter()
+            .zip(self.length.iter())
+            .map(|(coord, l)| coord.rem_euclid(*l))
+            .collect()
     }
 }
 

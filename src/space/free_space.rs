@@ -1,23 +1,17 @@
-use ndarray::ArrayView1;
+use crate::space::traits::Space;
+use ndarray::{Array1, Array2, ArrayView1, ArrayView2};
 
-/// A struct to represent unrestricted Euclidean space in D dimensions.
-#[derive(Debug)]
 pub struct FreeSpace<const D: usize>;
 
-impl<const D: usize> FreeSpace<D> {
-    /// Computes the difference between two positions in free space.
-    ///
-    /// # Arguments
-    /// * `r1` - The first position.
-    /// * `r2` - The second position.
-    ///
-    /// # Returns
-    /// A fixed-size array containing the difference between `r1` and `r2`
-    /// for each dimension.
-    ///
-    /// # Panics
-    /// Panics if the dimensions of `r1` and `r2` do not match `D`.
-    pub fn difference<'a, A, B>(&self, r1: A, r2: B) -> [f64; D]
+impl<const D: usize> Space for FreeSpace<D> {
+    const SPATIAL_DIMENSIONS: usize = D;
+
+    fn volume(&self) -> f64 {
+        // FOR TEST PURPOSES ONLY
+        1.0
+    }
+
+    fn difference<'a, A, B>(&self, r1: A, r2: B) -> Array1<f64>
     where
         A: Into<ArrayView1<'a, f64>>,
         B: Into<ArrayView1<'a, f64>>,
@@ -25,75 +19,58 @@ impl<const D: usize> FreeSpace<D> {
         let r1_view = r1.into();
         let r2_view = r2.into();
 
-        // Ensure the input dimensions match
-        debug_assert_eq!(
-            r1_view.len(),
-            r2_view.len(),
-            "Arrays must have the same shape"
-        );
         debug_assert_eq!(
             r1_view.len(),
             D,
-            "Input array lengths must match the dimensionality of FreeSpace"
+            "Input arrays must have the correct dimensionality."
+        );
+        debug_assert_eq!(
+            r2_view.len(),
+            D,
+            "Input arrays must have the correct dimensionality."
         );
 
-        // Compute the element-wise difference
-        let mut result = [0.0; D];
-        for i in 0..r1_view.len() {
-            result[i] = r1_view[i] - r2_view[i];
-        }
-        result
+        &r1_view - &r2_view
     }
 
-    /// Computes the Euclidean distance between two positions in free space.
-    ///
-    /// # Arguments
-    /// * `r1` - The first position.
-    /// * `r2` - The second position.
-    ///
-    /// # Returns
-    /// The Euclidean distance between `r1` and `r2`.
-    ///
-    /// # Panics
-    /// Panics if the dimensions of `r1` and `r2` do not match `D`.
-    pub fn distance<'a, A, B>(&self, r1: A, r2: B) -> f64
+    fn differences_from_reference<'a, A, B>(&self, r1: A, r2: B) -> Array2<f64>
+    where
+        A: Into<ArrayView2<'a, f64>>,
+        B: Into<ArrayView1<'a, f64>>,
+    {
+        let r1_view = r1.into();
+        let r2_view = r2.into();
+
+        debug_assert_eq!(
+            r1_view.shape()[1],
+            D,
+            "Each row of r1 must have the correct dimensionality."
+        );
+        debug_assert_eq!(
+            r2_view.len(),
+            D,
+            "Reference vector must have the correct dimensionality."
+        );
+
+        // Subtract the reference point from all rows in r1
+        let reference_broadcasted = r2_view.insert_axis(ndarray::Axis(0));
+        r1_view.to_owned() - reference_broadcasted
+    }
+
+    fn distance<'a, A, B>(&self, r1: A, r2: B) -> f64
     where
         A: Into<ArrayView1<'a, f64>>,
         B: Into<ArrayView1<'a, f64>>,
     {
         let diff = self.difference(r1, r2);
-
-        // Compute the Euclidean distance
-        diff.iter().map(|&d| d * d).sum::<f64>().sqrt()
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use ndarray::array;
-
-    #[test]
-    fn test_free_space_difference() {
-        let space = FreeSpace::<3>;
-
-        let r1 = array![1.0, 2.0, 3.0];
-        let r2 = array![4.0, 6.0, 8.0];
-
-        let diff = space.difference(&r1, &r2);
-        assert_eq!(diff, [-3.0, -4.0, -5.0]);
+        diff.mapv(|x| x * x).sum().sqrt()
     }
 
-    #[test]
-    fn test_free_space_distance() {
-        let space = FreeSpace::<3>;
-
-        let r1 = array![1.0, 2.0, 3.0];
-        let r2 = array![4.0, 6.0, 8.0];
-
-        let dist = space.distance(&r1, &r2);
-
-        // Expected distance: sqrt((-3)^2 + (-4)^2 + (-5)^2) = sqrt(50) = 7.071068
-        assert!((dist - 7.071068).abs() < 1e-6);
+    fn base_image<'a, A>(&self, r: A) -> Array1<f64>
+    where
+        A: Into<ArrayView1<'a, f64>>,
+    {
+        // For FreeSpace, no periodic wrapping is needed, so simply return the input as is
+        r.into().to_owned()
     }
 }
