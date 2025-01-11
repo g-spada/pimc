@@ -1,8 +1,10 @@
 use env_logger::Builder;
 use log::info;
 //use ndarray::{Array1, ArrayView1};
+use pimc_rs::action::traits::PotentialDensityMatrix;
 use pimc_rs::path_state::worm::Worm;
 use pimc_rs::space::free_space::FreeSpace;
+use pimc_rs::system::traits::SystemAccess;
 use pimc_rs::updates::monte_carlo_update::MonteCarloUpdate;
 use pimc_rs::updates::open_close::OpenClose;
 use pimc_rs::updates::redraw::Redraw;
@@ -10,6 +12,7 @@ use pimc_rs::updates::redraw_head::RedrawHead;
 use pimc_rs::updates::redraw_tail::RedrawTail;
 use pimc_rs::updates::swap::Swap;
 use pimc_rs::updates::worm_translate::WormTranslate;
+use pimc_rs::updates::proposed_update::ProposedUpdate;
 
 const N: usize = 3;
 const M: usize = 8;
@@ -17,8 +20,46 @@ const D: usize = 2;
 
 const MP1: usize = M + 1;
 
-fn two_lambda_tau(_: &Worm<N, MP1, D>, _: usize) -> f64 {
-    0.1
+pub struct MySystem {
+    pub space: FreeSpace<D>,
+    pub path: Worm<N, MP1, D>,
+}
+
+impl SystemAccess for MySystem {
+    type Space = FreeSpace<D>;
+    type WorldLine = Worm<N, MP1, D>;
+
+    fn space(&self) -> &Self::Space {
+        &self.space
+    }
+
+    fn path(&self) -> &Self::WorldLine {
+        &self.path
+    }
+
+    fn path_mut(&mut self) -> &mut Self::WorldLine {
+        &mut self.path
+    }
+
+    fn two_lambda_tau(&self, _: usize) -> f64 {
+        0.1
+    }
+}
+
+pub struct FakeDensityMatrix {}
+
+impl PotentialDensityMatrix for FakeDensityMatrix {
+    fn potential_density_matrix<S: SystemAccess> (&self, _system: &S) -> f64 {
+        1.0
+    }
+
+    fn potential_density_matrix_update<S: SystemAccess> (
+        &self,
+        _system: &S,
+        _update: &ProposedUpdate<f64>,
+    ) -> f64 {
+        0.5
+    }
 }
 
 fn main() {
@@ -26,6 +67,7 @@ fn main() {
     Builder::new().filter_level(log::LevelFilter::Trace).init();
 
     info!("Starting Example");
+    // Create path object
     let mut path = Worm::<N, MP1, D>::new();
     // Create a worm of length two: (T) - 0 - 2 - (H)
     path.set_preceding(0, None);
@@ -33,121 +75,152 @@ fn main() {
     path.set_preceding(2, Some(0));
     path.set_following(2, None);
 
+    // Space object
+    let flatlandia = FreeSpace::<D>;
+
+    // Combine path and space into system
+    let mut system = MySystem { space: flatlandia, path: path };
+
     // Print starting configuration
-    info!("Starting configuration:\n{:?}", path);
+    info!("Starting configuration:\n{:?}", system.path());
+
+    // Instantiate Action
+    let action = FakeDensityMatrix {};
 
     // RNG
     let mut rng = rand::thread_rng();
 
-    // Space object
-    let flatlandia = FreeSpace::<D>;
-
+    // MONTE CARLO UPDATES
     // Translate update
-    let mut mc_transl = WormTranslate::new([1.0, 2.0], |_, _| 0.5);
+    let mut mc_transl = WormTranslate {
+        max_displacement: 1.0,
+        accept_count: 0,
+        reject_count: 0,
+    };
 
     // Redraw update
-    let mut mc_redraw = Redraw::new(M / 3, M - 1, two_lambda_tau, |_, _| 0.5);
+    let mut mc_redraw = Redraw{
+        min_delta_t: M / 3,
+        max_delta_t: M - 1,
+        accept_count: 0,
+        reject_count: 0,
+    };
 
     // RedrawHead update
-    let mut mc_redrawhead = RedrawHead::new(M / 3, M - 1, two_lambda_tau, |_, _| 0.5);
+    let mut mc_redrawhead = RedrawHead {
+        min_delta_t: M / 3,
+        max_delta_t: M - 1,
+        accept_count: 0,
+        reject_count: 0,
+    };
+
 
     // RedrawTail update
-    let mut mc_redrawtail = RedrawTail::new(M / 3, M - 1, two_lambda_tau, |_, _| 0.5);
+    let mut mc_redrawtail = RedrawTail {
+        min_delta_t: M / 3,
+        max_delta_t: M - 1,
+        accept_count: 0,
+        reject_count: 0,
+    };
 
     // Open/Close update
-    let mut mc_openclose = OpenClose::new(
-        M / 3,
-        M - 1,
-        0.5,
-        1.0,
-        &flatlandia,
-        two_lambda_tau,
-        |_, _| 0.5,
-    );
+    let mut mc_openclose = OpenClose {
+        min_delta_t: M / 3,
+        max_delta_t: M - 1,
+        open_close_constant: 0.5,
+        max_head_displacement: 1.0,
+        accept_count: 0,
+        reject_count: 0,
+    };
 
     // Swap update
-    let mut mc_swap = Swap::new(M / 3, M - 1, two_lambda_tau, |_, _| 0.5, &flatlandia);
+    let mut mc_swap = Swap{
+        min_delta_t: M / 3,
+        max_delta_t: M - 1,
+        accept_count: 0,
+        reject_count: 0,
+    };
 
     for mc_it in 0..10 {
         info!("######################################");
         info!("# ITERATION {}", mc_it);
 
-        let success = mc_transl.try_update(&mut path, &mut rng);
+        let success = mc_transl.monte_carlo_update(&mut system, &action, &mut rng);
         if let Some(update) = success {
             for part in update.modified_particles {
                 info!(
                     "New path for p = {}\n{:?}",
                     part,
-                    path.positions(part, 0, path.time_slices())
+                    system.path().positions(part, 0, system.path().time_slices())
                 );
             }
         }
 
-        let success = mc_redraw.try_update(&mut path, &mut rng);
+        let success = mc_redraw.monte_carlo_update(&mut system, &action, &mut rng);
         if let Some(update) = success {
             for part in update.modified_particles {
                 info!(
                     "New path for p = {}\n{:?}",
                     part,
-                    path.positions(part, 0, path.time_slices())
+                    system.path().positions(part, 0, system.path().time_slices())
                 );
             }
         }
 
-        let success = mc_redrawhead.try_update(&mut path, &mut rng);
+        let success = mc_redrawhead.monte_carlo_update(&mut system, &action, &mut rng);
         if let Some(update) = success {
             for part in update.modified_particles {
                 info!(
                     "New path for p = {}\n{:?}",
                     part,
-                    path.positions(part, 0, path.time_slices())
+                    system.path().positions(part, 0, system.path().time_slices())
                 );
             }
         }
 
-        let success = mc_redrawtail.try_update(&mut path, &mut rng);
+        let success = mc_redrawtail.monte_carlo_update(&mut system, &action, &mut rng);
         if let Some(update) = success {
             for part in update.modified_particles {
                 info!(
                     "New path for p = {}\n{:?}",
                     part,
-                    path.positions(part, 0, path.time_slices())
+                    system.path().positions(part, 0, system.path().time_slices())
                 );
             }
         }
 
-        let success = mc_openclose.try_update(&mut path, &mut rng);
+        let success = mc_openclose.monte_carlo_update(&mut system, &action, &mut rng);
         if let Some(update) = success {
             for part in update.modified_particles {
                 info!(
                     "New path for p = {}\n{:?}",
                     part,
-                    path.positions(part, 0, path.time_slices())
+                    system.path().positions(part, 0, system.path().time_slices())
                 );
             }
         }
 
-        let success = mc_swap.try_update(&mut path, &mut rng);
+        let success = mc_swap.monte_carlo_update(&mut system, &action, &mut rng);
         if let Some(update) = success {
             for part in update.modified_particles {
                 info!(
                     "New path for p = {}\n{:?}",
                     part,
-                    path.positions(part, 0, path.time_slices())
+                    system.path().positions(part, 0, system.path().time_slices())
                 );
             }
         }
 
         // Print configuration
-        info!("Current configuration:\n{:?}", path);
-        info!("Head is {:?}", path.worm_head());
-        info!("Tail is {:?}", path.worm_tail());
-        info!("Sector is {:?}", path.sector());
+        info!("Current configuration:\n{:?}", system.path());
+        info!("Head is {:?}", system.path().worm_head());
+        info!("Tail is {:?}", system.path().worm_tail());
+        info!("Sector is {:?}", system.path().sector());
 
         // Check permutations
         for particle in 0..N {
-            if let Some(next) = path.following(particle) {
-                let diff = path.position(particle, M).to_owned() - path.position(next, 0);
+            if let Some(next) = system.path().following(particle) {
+                let diff = system.path().position(particle, M).to_owned() - system.path().position(next, 0);
                 assert!(
                     diff.iter().any(|&l| l.abs() < 1e-10),
                     "Particles {} and {} not correctly glued together: difference is {:}",

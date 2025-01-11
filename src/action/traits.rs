@@ -12,11 +12,16 @@ pub trait PairPotential {
 }
 
 /// Potential density matrix
-pub trait PotentialDensityMatrix<S: SystemAccess> {
-    fn potential_density_matrix(&self, system: &S) -> f64;
-    fn potential_density_matrix_position_update(
+pub trait PotentialDensityMatrix{
+    fn potential_density_matrix<S: SystemAccess> (&self, system: &S) -> f64;
+    fn potential_density_matrix_update<S: SystemAccess> (
         &self,
         system: &S,
         update: &ProposedUpdate<f64>,
     ) -> f64;
 }
+
+// Temporary Action definition
+// TODO: complete with free propagators, potentials, etc...
+//pub trait Action<S> = PotentialDensityMatrix<S>;
+//impl<T: PotentialDensityMatrix> Action for T {}

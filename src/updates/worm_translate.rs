@@ -1,51 +1,28 @@
 use super::accepted_update::AcceptedUpdate;
 use super::monte_carlo_update::MonteCarloUpdate;
 use super::proposed_update::ProposedUpdate;
+use crate::action::traits::PotentialDensityMatrix;
 use crate::path_state::sector::Sector;
 use crate::path_state::traits::{
     WorldLineDimensions, WorldLinePermutationAccess, WorldLinePositionAccess, WorldLineWormAccess,
 };
 use crate::path_state::traverse_polymer::traverse_polymer;
+use crate::system::traits::SystemAccess;
 use log::{debug, trace};
 use ndarray::Array1;
 
 /// A Monte Carlo update that translates both open and closed polymers.
-pub struct WormTranslate<F, W, const D: usize> {
-    max_displacement: [f64; D],
-    weight_function: F,
-    accept_count: usize,
-    reject_count: usize,
-    _phantom: std::marker::PhantomData<W>, // Ensures the type W is associated with the struct without requiring an actual field of type W
+pub struct WormTranslate {
+    pub max_displacement: f64,
+    pub accept_count: usize,
+    pub reject_count: usize,
 }
 
-impl<F, W, const D: usize> WormTranslate<F, W, D>
-where
-    F: Fn(&W, &ProposedUpdate<f64>) -> f64 + Send + Sync + 'static,
-    W: WorldLineDimensions
-        + WorldLinePositionAccess
-        + WorldLinePermutationAccess
-        + WorldLineWormAccess,
-{
-    /// Initializes `WormTranslate` with the specified maximum displacements.
-    ///
-    /// # Arguments
-    /// * `max_displacement` - An array specifying the maximum displacement for each dimension.
-    pub fn new(max_displacement: [f64; D], weight_function: F) -> Self {
-        assert_eq!(
-            D,
-            W::SPATIAL_DIMENSIONS,
-            "Mismatch in the spatial dimensions"
-        );
-        Self {
-            max_displacement,
-            weight_function,
-            accept_count: 0,
-            reject_count: 0,
-            _phantom: std::marker::PhantomData,
-        }
-    }
-
-    fn select_initial_particle(&self, worldlines: &W, rng: &mut impl rand::Rng) -> usize {
+impl WormTranslate {
+    fn select_initial_particle<W>(&self, worldlines: &W, rng: &mut impl rand::Rng) -> usize
+    where
+        W: WorldLinePermutationAccess + WorldLineWormAccess + WorldLinePositionAccess,
+    {
         let mut p0: usize = rng.gen_range(0..worldlines.particles());
         if worldlines.sector() == Sector::G {
             // Traverse polymer to detect closed or open configuration.
@@ -55,45 +32,53 @@ where
     }
 }
 
-impl<F, W, const D: usize> MonteCarloUpdate<W> for WormTranslate<F, W, D>
+impl<S, A> MonteCarloUpdate<S, A> for WormTranslate
 where
-    F: Fn(&W, &ProposedUpdate<f64>) -> f64 + Send + Sync + 'static,
-    W: WorldLineDimensions
+    S: SystemAccess,
+    S::WorldLine: WorldLineDimensions
         + WorldLinePositionAccess
         + WorldLinePermutationAccess
         + WorldLineWormAccess,
+    A: PotentialDensityMatrix,
 {
-    fn try_update(
+    fn monte_carlo_update(
         &mut self,
-        worldlines: &mut W,
+        system: &mut S,
+        action: &A,
         rng: &mut impl rand::Rng,
     ) -> Option<AcceptedUpdate> {
         debug!("Trying update");
         let mut proposal = ProposedUpdate::new();
 
+        let worldlines = system.path();
+        //let tot_particles = worldlines.particles();
+        let tot_slices = S::WorldLine::TIME_SLICES;
+        let tot_directions = S::WorldLine::SPATIAL_DIMENSIONS;
+        // Find head of the worm
         // Randomly select an initial particle index
         let p0 = self.select_initial_particle(worldlines, rng);
+
         // Generate displacement
-        let displacement = Array1::from_shape_fn(self.max_displacement.len(), |i| {
-            rng.gen_range(-self.max_displacement[i]..=self.max_displacement[i])
-        });
-        trace!("Displacement vector {:}", displacement);
+        let displacement: Array1<f64> = (0..tot_directions)
+            .map(|_| rng.gen_range(-self.max_displacement..=self.max_displacement))
+            .collect();
+        trace!("Displacement vector {:?}", displacement);
 
         // Apply the displacement to the whole polymer
         let mut p = p0;
         loop {
             let new_positions = displacement
-                .broadcast([W::TIME_SLICES, D])
+                .broadcast([tot_slices, tot_directions])
                 .unwrap()
                 .to_owned()
-                + worldlines.positions(p, 0, W::TIME_SLICES);
+                + worldlines.positions(p, 0, tot_slices);
             debug_assert_eq!(
                 new_positions.shape()[0],
-                W::TIME_SLICES,
+                tot_slices,
                 "Expected positions to match time slices"
             );
 
-            proposal.add_position_modification(p, 0..W::TIME_SLICES, new_positions);
+            proposal.add_position_modification(p, 0..tot_slices, new_positions);
             if let Some(next) = worldlines.following(p) {
                 if next == p0 {
                     // End of the cycle.
@@ -106,7 +91,7 @@ where
             }
         }
 
-        let acceptance_ratio = (self.weight_function)(worldlines, &proposal);
+        let acceptance_ratio = action.potential_density_matrix_update(system, &proposal);
         trace!("Acceptance ratio {:}", acceptance_ratio);
 
         // Apply Metropolis-Hastings acceptance criterion
@@ -114,10 +99,16 @@ where
         trace!("Drawn probability: {}", proba);
         if proba < acceptance_ratio {
             // Accept the update
+            let worldlines_mut = system.path_mut();
             for particle in proposal.get_modified_particles() {
                 if let Some(modifications) = proposal.get_modifications(particle) {
                     for (range, new_positions) in modifications {
-                        worldlines.set_positions(particle, range.start, range.end, new_positions);
+                        worldlines_mut.set_positions(
+                            particle,
+                            range.start,
+                            range.end,
+                            new_positions,
+                        );
                     }
                 }
             }
