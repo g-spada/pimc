@@ -10,7 +10,7 @@ use ndarray::{Array1, Array2, ArrayView1, ArrayView2};
 #[derive(Debug, PartialEq)]
 pub struct PeriodicBox<const D: usize> {
     /// The lengths of the box in each spatial dimension.
-    length: [f64; D],
+    pub length: [f64; D],
 }
 
 impl<const D: usize> PeriodicBox<D> {

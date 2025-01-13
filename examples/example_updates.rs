@@ -3,7 +3,8 @@ use log::info;
 //use ndarray::{Array1, ArrayView1};
 use pimc::action::traits::PotentialDensityMatrix;
 use pimc::path_state::worm::Worm;
-use pimc::space::free_space::FreeSpace;
+//use pimc::space::free_space::FreeSpace;
+use pimc::space::periodic_box::PeriodicBox;
 use pimc::system::homonuclear_system::HomonuclearSystem;
 use pimc::system::traits::SystemAccess;
 use pimc::updates::accepted_update::AcceptedUpdate;
@@ -54,11 +55,15 @@ fn main() {
     path.set_following(2, None);
 
     // Space object
-    let flatlandia = FreeSpace::<D>;
+    //let flatlandia = FreeSpace::<D>;
+    let periodic_box = PeriodicBox::<D> {
+        length: [4.0, 4.0],
+    };
 
     // Combine path and space into system
     let mut system = HomonuclearSystem {
-        space: flatlandia,
+        //space: flatlandia,
+        space: periodic_box,
         path: path,
         two_lambda_tau: 0.1,
     };
