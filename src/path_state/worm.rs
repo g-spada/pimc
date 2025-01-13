@@ -15,7 +15,7 @@ use std::io::{self, BufReader, BufWriter};
 ///
 /// # Example
 /// ```
-/// use pimc_rs::path_state::worm::Worm;
+/// use pimc::path_state::worm::Worm;
 ///
 /// // Create a new Worm instance
 /// let mut world = Worm::<2,3,3>::new(); // 2 particles, 3 time slices, 3D space
@@ -65,7 +65,7 @@ impl<const N: usize, const M: usize, const D: usize> Worm<N, M, D> {
     ///
     /// # Example
     /// ```
-    /// use pimc_rs::path_state::worm::Worm;
+    /// use pimc::path_state::worm::Worm;
     /// use ndarray::array;
     ///
     /// let mut world = Worm::<2, 3, 3>::new();
@@ -260,7 +260,7 @@ impl<const N: usize, const M: usize, const D: usize> Worm<N, M, D> {
     ///
     /// # Example
     /// ```
-    /// use pimc_rs::path_state::worm::Worm;
+    /// use pimc::path_state::worm::Worm;
     /// use ndarray::array;
     ///
     /// let mut world = Worm::<2,5,3>::new(); // 2 particles, 5 time slices, 3D space
@@ -356,7 +356,7 @@ impl<const N: usize, const M: usize, const D: usize> Worm<N, M, D> {
     ///
     /// # Example
     /// ```
-    /// use pimc_rs::path_state::worm::Worm;
+    /// use pimc::path_state::worm::Worm;
     /// use ndarray::array;
     ///
     /// let mut world = Worm::<2,5,3>::new(); // 2 particles, 5 time slices, 3D space

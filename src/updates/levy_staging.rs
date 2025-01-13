@@ -33,7 +33,7 @@ use rand_distr::{Distribution, Normal};
 ///
 /// # Example
 /// ```rust
-/// use pimc_rs::updates::levy_staging::levy_staging;
+/// use pimc::updates::levy_staging::levy_staging;
 /// use ndarray::Array2;
 /// use rand::thread_rng;
 ///

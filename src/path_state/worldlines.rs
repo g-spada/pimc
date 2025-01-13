@@ -9,7 +9,7 @@ use std::io::{self, BufReader, BufWriter};
 ///
 /// # Example
 /// ```
-/// use pimc_rs::path_state::worldlines::WorldLines;
+/// use pimc::path_state::worldlines::WorldLines;
 ///
 /// // Create a new WorldLines instance
 /// let mut world = WorldLines::<2,3,3>::new(); // 2 particles, 3 time slices, 3D space
@@ -164,7 +164,7 @@ impl<const N: usize, const M: usize, const D: usize> WorldLines<N, M, D> {
     ///
     /// # Example
     /// ```
-    /// use pimc_rs::path_state::worldlines::WorldLines;
+    /// use pimc::path_state::worldlines::WorldLines;
     /// use ndarray::array;
     ///
     /// let mut world = WorldLines::<2,5,3>::new(); // 2 particles, 5 time slices, 3D space
@@ -221,7 +221,7 @@ impl<const N: usize, const M: usize, const D: usize> WorldLines<N, M, D> {
     ///
     /// # Example
     /// ```
-    /// use pimc_rs::path_state::worldlines::WorldLines;
+    /// use pimc::path_state::worldlines::WorldLines;
     /// use ndarray::array;
     ///
     /// let mut world = WorldLines::<2,5,3>::new(); // 2 particles, 5 time slices, 3D space
@@ -286,7 +286,7 @@ impl<const N: usize, const M: usize, const D: usize> WorldLines<N, M, D> {
     ///
     /// # Example
     /// ```
-    /// use pimc_rs::path_state::worldlines::WorldLines;
+    /// use pimc::path_state::worldlines::WorldLines;
     /// use ndarray::array;
     ///
     /// let mut world = WorldLines::<2, 3, 3>::new();
