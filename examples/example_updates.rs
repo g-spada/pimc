@@ -4,6 +4,7 @@ use log::info;
 use pimc_rs::action::traits::PotentialDensityMatrix;
 use pimc_rs::path_state::worm::Worm;
 use pimc_rs::space::free_space::FreeSpace;
+use pimc_rs::system::homonuclear_system::HomonuclearSystem;
 use pimc_rs::system::traits::SystemAccess;
 use pimc_rs::updates::accepted_update::AcceptedUpdate;
 use pimc_rs::updates::monte_carlo_update::MonteCarloUpdate;
@@ -22,32 +23,6 @@ const M: usize = 8;
 const D: usize = 2;
 
 const MP1: usize = M + 1;
-
-pub struct MySystem {
-    pub space: FreeSpace<D>,
-    pub path: Worm<N, MP1, D>,
-}
-
-impl SystemAccess for MySystem {
-    type Space = FreeSpace<D>;
-    type WorldLine = Worm<N, MP1, D>;
-
-    fn space(&self) -> &Self::Space {
-        &self.space
-    }
-
-    fn path(&self) -> &Self::WorldLine {
-        &self.path
-    }
-
-    fn path_mut(&mut self) -> &mut Self::WorldLine {
-        &mut self.path
-    }
-
-    fn two_lambda_tau(&self, _: usize) -> f64 {
-        0.1
-    }
-}
 
 pub struct FakeDensityMatrix {}
 
@@ -82,9 +57,10 @@ fn main() {
     let flatlandia = FreeSpace::<D>;
 
     // Combine path and space into system
-    let mut system = MySystem {
+    let mut system = HomonuclearSystem {
         space: flatlandia,
         path: path,
+        two_lambda_tau: 0.1,
     };
 
     // Print starting configuration
