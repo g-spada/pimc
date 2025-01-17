@@ -6,7 +6,7 @@ const ZETA_3_2: f64 = 2.612_375_348_685_488_f64;
 #[cfg(test)]
 /// Computes the single particle functions z(k \beta) and their derivatives dz(k\beta)/d\beta for a
 /// system of `npart` bosons in a cubic box of side L with periodic boundary conditions, and at the temperature
-/// `temp` measured in units of the ideal gas BEC condensation temperature Tc0.
+/// T = 1/(k_B \beta) measured in units of the ideal gas BEC condensation temperature Tc0.
 /// Tc0 = 2 \pi \hbar^2 / m * (( npart/L^3 ) / \zeta(3/2))^(3/2)
 ///
 /// The single particle functions z(k \beta) are defined as:
@@ -14,18 +14,25 @@ const ZETA_3_2: f64 = 2.612_375_348_685_488_f64;
 ///
 /// where the sum is carried over nx, ny and nz is over 0, \pm 1, \pm 2, ...
 /// and the single particle energies \varepsilon(nx, ny, nz) given by
-/// \varepsilon(nx, ny, nz) = (2 \pi)^2 \hbar^2 / (2 m L^2) * (nx^2 + ny^2 + nz^2)  
+/// \varepsilon(nx, ny, nz) = (2 \pi)^2 \hbar^2 / (2 m L^2) * (nx^2 + ny^2 + nz^2)
+///
+/// # Arguments
+/// * `npart` - Total number of particles.
+/// * `temp` - Temperature in units of Tc0.
 ///
 /// # Returns
-/// * A tuple of vectors containing the z(k \beta) and dz(k\beta)/d\beta for k = 0,...,npart
+/// * A tuple of vectors containing the z(k \beta) and dz(k\beta)/d\beta. The index labels k and
+///   goes from 0 to npart included. The k=0 terms are canonically set to 1 and 0 respectively.
 ///   - Values of dz/d\beta are given in units of kB*Tc0
 ///
 /// # Implementation details
-/// * This is the raw (unoptimized) version that sums all the values without exploiting symmetries
+/// * Raw (unoptimized) version that sums all the values without exploiting symmetries.
+/// * For test purposes.
 fn single_particle_z_dz_raw(
     npart: usize, // Total number of particles
     temp: f64,    // Temperature in units of Tc0
 ) -> (Vec<f64>, Vec<f64>) {
+    assert!(temp > 0.0, "Temperature must be non-zero and positve.");
     const NMAX: i32 = 20;
     // Determine the prefactor  (2 \pi)^2 \hbar^2 / (2 m L^2) in units of kB Tc0
     let energy_constant = PI * (ZETA_3_2 / npart as f64).powf(2.0 / 3.0);
@@ -40,11 +47,12 @@ fn single_particle_z_dz_raw(
                 let n3sq = (n3 as f64).powf(2.0);
                 let n_squared = n1sq + n2sq + n3sq;
                 let epsilon_n = energy_constant * n_squared;
-                let beta_epsilon_n = epsilon_n / temp;
+                let exp_neg_beta_epsilon_n = (-epsilon_n / temp).exp();
                 for k in 0..=npart {
-                    single_particle_z[k] += (-beta_epsilon_n * k as f64).exp();
-                    single_particle_dz[k] +=
-                        (-beta_epsilon_n * k as f64).exp() * (-epsilon_n * k as f64);
+                    let k_f = k as f64;
+                    let exp_term = exp_neg_beta_epsilon_n.powf(k_f);
+                    single_particle_z[k] += exp_term;
+                    single_particle_dz[k] += exp_term * (-epsilon_n * k_f);
                 }
             }
         }
@@ -56,7 +64,7 @@ fn single_particle_z_dz_raw(
 
 /// Computes the single particle functions z(k \beta) and their derivatives dz(k\beta)/d\beta for a
 /// system of `npart` bosons in a cubic box of side L with periodic boundary conditions, and at the temperature
-/// `temp` measured in units of the ideal gas BEC condensation temperature Tc0.
+/// T = 1/(k_B \beta) measured in units of the ideal gas BEC condensation temperature Tc0.
 /// Tc0 = 2 \pi \hbar^2 / m * (( npart/L^3 ) / \zeta(3/2))^(3/2)
 ///
 /// The single particle functions z(k \beta) are defined as:
@@ -64,19 +72,27 @@ fn single_particle_z_dz_raw(
 ///
 /// where the sum is carried over nx, ny and nz is over 0, \pm 1, \pm 2, ...
 /// and the single particle energies \varepsilon(nx, ny, nz) given by
-/// \varepsilon(nx, ny, nz) = (2 \pi)^2 \hbar^2 / (2 m L^2) * (nx^2 + ny^2 + nz^2)  
+/// \varepsilon(nx, ny, nz) = (2 \pi)^2 \hbar^2 / (2 m L^2) * (nx^2 + ny^2 + nz^2)
+///
+/// # Arguments
+/// * `npart` - Total number of particles.
+/// * `temp` - Temperature in units of Tc0.
 ///
 /// # Returns
-/// * A tuple of vectors containing the z(k \beta) and dz(k\beta)/d\beta for k = 0,...,npart
-/// (included)
+/// * A tuple of vectors containing the z(k \beta) and dz(k\beta)/d\beta. The index labels k and
+///   goes from 0 to npart included. The k=0 terms are canonically set to 1 and 0 respectively.
 ///   - Values of dz/d\beta are given in units of kB*Tc0
 pub fn single_particle_z_dz(
     npart: usize, // Total number of particles
     temp: f64,    // Temperature in units of Tc0
 ) -> (Vec<f64>, Vec<f64>) {
+    assert!(temp > 0.0, "Temperature must be non-zero and positve.");
     let energy_constant = PI * (ZETA_3_2 / npart as f64).powf(2. / 3.);
     // Dynamically determine the value of nmax based on the input parameters
-    let nmax: usize = (400.0 / (energy_constant / temp)).sqrt().ceil().min(10.) as usize;
+    const MAX_EXPONENT: f64 = 400.0;
+    const NMAX_LOWER_BOUND: usize = 10;
+    let nmax: usize =
+        ((MAX_EXPONENT / (energy_constant / temp)).sqrt().ceil() as usize).min(NMAX_LOWER_BOUND);
     let mut single_particle_z = vec![1.0; npart + 1]; // case (nx=0,ny=0,nz=0) already included
     let mut single_particle_dz = vec![0.0; npart + 1];
     // We sum only on positive numbers and account for the proper symmetry factor
@@ -84,17 +100,19 @@ pub fn single_particle_z_dz(
         // n1 != 0, n2 = 0, n3 = 0
         let n1sq = (n1 as f64).powf(2.0);
         let epsilon_n = energy_constant * n1sq;
-        let beta_epsilon_n = epsilon_n / temp;
-        for (i, (z, dz)) in single_particle_z
+        let exp_neg_beta_epsilon_n = (-epsilon_n / temp).exp();
+        for (k, (z, dz)) in single_particle_z
             .iter_mut()
             .zip(single_particle_dz.iter_mut())
             .enumerate()
+            .skip(1)
         {
-            let k = i as f64;
+            let k_f = k as f64;
+            let exp_term = exp_neg_beta_epsilon_n.powf(k_f);
             // The factor of 6 = 3 * 2 is obtained the 3 possible choices of selecting
             // n1 out of (nx, ny, nz) and the 2 possibilities of positive and negative integers.
-            *z += 6.0 * (-beta_epsilon_n * k).exp();
-            *dz += 6.0 * (-beta_epsilon_n * k).exp() * (-k * epsilon_n);
+            *z += 6.0 * exp_term;
+            *dz += 6.0 * exp_term * (-k_f * epsilon_n);
         }
         // n1 != 0, n2 != 0, n3 = 0
         for n2 in n1..=nmax {
@@ -104,18 +122,20 @@ pub fn single_particle_z_dz(
             let n1sq = (n1 as f64).powf(2.0);
             let n2sq = (n2 as f64).powf(2.0);
             let epsilon_n = energy_constant * (n1sq + n2sq);
-            let beta_epsilon_n = epsilon_n / temp;
-            for (i, (z, dz)) in single_particle_z
+            let exp_neg_beta_epsilon_n = (-epsilon_n / temp).exp();
+            for (k, (z, dz)) in single_particle_z
                 .iter_mut()
                 .zip(single_particle_dz.iter_mut())
                 .enumerate()
+                .skip(1)
             {
-                let k = i as f64;
+                let k_f = k as f64;
+                let exp_term = exp_neg_beta_epsilon_n.powf(k_f);
                 // The factor of 12 = 3 * 2 * 2 is obtained the 3 possible choices of selecting
                 // (n1, n2) out of (nx, ny, nz) and the 2 possibilities of positive and negative
                 // integers for each of n1 and n2.
-                *z += factor * 12.0 * (-beta_epsilon_n * k).exp();
-                *dz += factor * 12.0 * (-beta_epsilon_n * k).exp() * (-k * epsilon_n);
+                *z += factor * 12.0 * exp_term;
+                *dz += factor * 12.0 * exp_term * (-k_f * epsilon_n);
             }
             // n1 != 0, n2 != 0, n3 != 0
             for n3 in n2..=nmax {
@@ -133,17 +153,19 @@ pub fn single_particle_z_dz(
                 };
                 let n3sq = (n3 as f64).powf(2.0);
                 let epsilon_n = energy_constant * (n1sq + n2sq + n3sq);
-                let beta_epsilon_n = epsilon_n / temp;
-                for (i, (z, dz)) in single_particle_z
+                let exp_neg_beta_epsilon_n = (-epsilon_n / temp).exp();
+                for (k, (z, dz)) in single_particle_z
                     .iter_mut()
                     .zip(single_particle_dz.iter_mut())
                     .enumerate()
+                    .skip(1)
                 {
-                    let k = i as f64;
+                    let k_f = k as f64;
+                    let exp_term = exp_neg_beta_epsilon_n.powf(k_f);
                     // The factor of 8 = 2 * 2 * 2 is obtained the 2 possibilities of positive and negative
                     // integers for each of n1, n2 and n3.
-                    *z += factor * 8.0 * (-beta_epsilon_n * k).exp();
-                    *dz += factor * 8.0 * (-beta_epsilon_n * k).exp() * (-k * epsilon_n);
+                    *z += factor * 8.0 * exp_term;
+                    *dz += factor * 8.0 * exp_term * (-k_f * epsilon_n);
                 }
             }
         }
@@ -184,9 +206,7 @@ pub fn compute_ln_partition_functions(
     );
     let mut ln_partition_function = vec![0.0_f64; single_particle_z.len()];
     let mut deriv_ln_partition_function = vec![0.0_f64; single_particle_z.len()];
-    // Setting values for N = 0 (arbitrary)
-    //ln_partition_function[0] = -f64::INFINITY;
-    //deriv_ln_partition_function[0] = -f64::INFINITY;
+    // Recursion relations start with Z_0 = 1 (thus ln Z_0 = 0 and dlnZ_0/d\beta = 0)
     // Settig values for N = 1
     let z1val = single_particle_z[1];
     let dz1val = deriv_single_particle_z[1];
@@ -271,7 +291,7 @@ mod tests {
         ];
         for (&temp, &expected) in temps.iter().zip(E_EXPECTED.iter()) {
             let (z1, dz1) = single_particle_z_dz(N, temp);
-            let (lnz, dlnz) = compute_ln_partition_functions(z1, dz1);
+            let (_lnz, dlnz) = compute_ln_partition_functions(z1, dz1);
             let energy = -dlnz[N] / N as f64;
             //println!("{:#?}", lnz);
             //println!("{:#?}", dlnz);

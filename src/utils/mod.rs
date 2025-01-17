@@ -1,1 +1,1 @@
-pub mod ideal_canonical_bosons;
+pub mod ideal_bosons;
