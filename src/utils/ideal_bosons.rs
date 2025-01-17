@@ -1,7 +1,5 @@
+use super::consts::ZETA_3_2;
 use std::f64::consts::PI;
-
-const ZETA_3_2: f64 = 2.612_375_348_685_488_f64;
-//const ZETA_5_2: f64 = 1.341487257250917179756769693348_f64;
 
 #[cfg(test)]
 /// Computes the single particle functions z(k \beta) and their derivatives dz(k\beta)/d\beta for a
