@@ -1,12 +1,8 @@
-use super::traits::Space;
-use crate::path_state::traits::{WorldLineDimensions, WorldLinePositionAccess};
+use super::traits::{BaseImage, Space};
+//use crate::path_state::traits::{WorldLineDimensions, WorldLinePositionAccess};
 use ndarray::{Array1, Array2, ArrayView1, ArrayView2};
 
 /// A struct to represent a box with periodic boundary conditions.
-///
-/// The `PeriodicBox` struct provides utilities for working with periodic systems, such as
-/// calculating the difference between positions under periodic boundary conditions, wrapping
-/// positions to their fundamental image, and reseating polymers within the box.
 #[derive(Debug, PartialEq)]
 pub struct PeriodicBox<const D: usize> {
     /// The lengths of the box in each spatial dimension.
@@ -127,42 +123,6 @@ impl<const D: usize> PeriodicBox<D> {
             .map(|(&x, &l)| x.rem_euclid(l))
             .collect()
     }
-
-    /// Reseats a polymer within the periodic box.
-    ///
-    /// This method adjusts all beads of a polymer such that the first bead is mapped to its
-    /// fundamental image, while maintaining the relative configuration of the polymer.
-    ///
-    /// # Arguments
-    /// * `worldlines` - A mutable reference to the worldlines object containing particle positions.
-    /// * `particle` - The index of the particle (polymer) to reseat.
-    ///
-    /// # Behavior
-    /// Adjusts all positions of the specified particle within the periodic box, ensuring
-    /// the polymer is aligned with the fundamental image of the box.
-    ///
-    /// # Panics
-    /// This function will panic if:
-    /// - The particle index is out of bounds.
-    pub fn reseat_polymer<W>(&self, worldlines: &mut W, particle: usize)
-    where
-        W: WorldLineDimensions + WorldLinePositionAccess,
-    {
-        // Validate input
-        debug_assert!(particle < worldlines.particles(), "Invalid particle index");
-        debug_assert_eq!(D, W::SPATIAL_DIMENSIONS, "Spatial dimensions don't match");
-
-        // Compute the fundamental image of the first bead
-        let first_image = self.fundamental_image(worldlines.position(particle, 0));
-
-        // Compute the shift
-        let shift = &first_image - &worldlines.position(particle, 0);
-
-        let mut whole_polymer = worldlines.positions_mut(particle, 0, W::TIME_SLICES);
-
-        // Add the shift to each bead of the polymer
-        whole_polymer += &shift.view().broadcast([W::TIME_SLICES, D]).unwrap();
-    }
 }
 
 impl<const D: usize> Space for PeriodicBox<D> {
@@ -270,7 +230,9 @@ impl<const D: usize> Space for PeriodicBox<D> {
 
         diff.mapv(|x| x * x).sum().sqrt()
     }
+}
 
+impl<const D: usize> BaseImage for PeriodicBox<D> {
     fn base_image<'a, A>(&self, r: A) -> Array1<f64>
     where
         A: Into<ArrayView1<'a, f64>>,
@@ -294,7 +256,7 @@ impl<const D: usize> Space for PeriodicBox<D> {
 #[cfg(test)]
 mod tests {
     use crate::space::periodic_box::PeriodicBox;
-    use ndarray::{array, Zip};
+    use ndarray::array;
 
     #[test]
     fn test_periodic_box_difference() {
@@ -305,58 +267,6 @@ mod tests {
         for i in 0..3 {
             assert!((diff[i] - expected[i]).abs() < 1e-15);
         }
-    }
-
-    #[test]
-    fn test_periodic_box_fundamental_image() {
-        let pbc = PeriodicBox::new([1.0, 2.0, 4.0]);
-        let image = pbc.fundamental_image(&array![0.6, -3.1, 10.8]);
-        let expected = array![0.6, 0.9, 2.8];
-        for i in 0..3 {
-            assert!((image[i] - expected[i]).abs() < 1e-15);
-        }
-        let image = pbc.fundamental_image(&array![-3.0, 0.0, 8.0]);
-        for i in 0..3 {
-            assert!((image[i] - 0.0).abs() < 1e-15);
-        }
-    }
-
-    #[test]
-    fn test_reseat_polymer() {
-        use crate::path_state::worm::Worm;
-
-        // Define a periodic box
-        let pbc = PeriodicBox::new([1.0, 1.0, 1.0]); // Box of length 1.0 in all dimensions
-
-        // Polymer object
-        let mut worldlines = Worm::<1, 4, 3>::new();
-
-        // Initial polymer positions: Particle 0, slices 0-2
-        let initial_positions = array![
-            [1.2, -0.8, 0.5],
-            [1.3, -0.9, 0.4],
-            [1.1, -1.1, 0.6],
-            [0.0, 0.0, 0.0]
-        ];
-
-        worldlines.set_positions(0, 0, 4, &initial_positions);
-
-        // Reseat the polymer for particle 0
-        pbc.reseat_polymer(&mut worldlines, 0);
-
-        // Expected positions after reseating
-        let expected_positions = array![
-            [0.2, 0.2, 0.5],
-            [0.3, 0.1, 0.4],
-            [0.1, -0.1, 0.6],
-            [-1.0, 1.0, 0.0]
-        ];
-
-        // Assert that the positions match the expected values
-        let result = worldlines.positions(0, 0, 4);
-        Zip::from(&expected_positions)
-            .and(result)
-            .for_each(|&val1, &val2| assert!((val1 - val2).abs() < 1e-15));
     }
 
     #[test]

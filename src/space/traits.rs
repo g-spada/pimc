@@ -24,7 +24,9 @@ pub trait Space {
     where
         A: Into<ArrayView1<'a, f64>>,
         B: Into<ArrayView1<'a, f64>>;
+}
 
+pub trait BaseImage {
     /// Get the point's base image within the fundamental simulation cell.
     fn base_image<'a, A>(&self, r: A) -> Array1<f64>
     where

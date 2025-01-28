@@ -65,12 +65,4 @@ impl<const D: usize> Space for FreeSpace<D> {
         let diff = self.difference(r1, r2);
         diff.mapv(|x| x * x).sum().sqrt()
     }
-
-    fn base_image<'a, A>(&self, r: A) -> Array1<f64>
-    where
-        A: Into<ArrayView1<'a, f64>>,
-    {
-        // For FreeSpace, no periodic wrapping is needed, so simply return the input as is
-        r.into().to_owned()
-    }
 }
