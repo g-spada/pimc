@@ -3,7 +3,6 @@ use super::levy_staging::levy_staging;
 use super::monte_carlo_update::MonteCarloUpdate;
 use super::proposed_update::ProposedUpdate;
 use crate::action::traits::PotentialDensityMatrix;
-use std::f64::consts::PI;
 use crate::path_state::sector::Sector;
 use crate::path_state::traits::{
     WorldLineDimensions, WorldLinePermutationAccess, WorldLinePositionAccess, WorldLineWormAccess,
@@ -13,6 +12,7 @@ use crate::system::traits::SystemAccess;
 use log::{debug, trace};
 use ndarray::Array2;
 use rand_distr::{Distribution, Normal};
+use std::f64::consts::PI;
 
 /// A Monte Carlo update that opens/closes polymer cycles.
 ///
@@ -82,42 +82,44 @@ impl OpenClose {
 
         // Create an Array2 containing the proposed new positions
         let mut redraw_segment = Array2::<f64>::zeros((delta_t + 1, tot_directions));
+
         // Copy the initial bead (p0,t0)
-        redraw_segment
-            .row_mut(0)
-            .assign(&r_pivot);
+        redraw_segment.row_mut(0).assign(&r_pivot);
 
         // Propose HEAD bead according to the gaussian free-particle weight
         let sigma_sq = two_lambda_tau * delta_t as f64;
         let normal = Normal::new(0.0, sigma_sq.sqrt()).unwrap(); // Normal distribution (mean = 0, std_dev = sigma)
-
-        for i in 0..tot_directions {
-            redraw_segment[[delta_t, i]] = redraw_segment[[0, i]] + normal.sample(rng);
-        }
+        redraw_segment.row_mut(delta_t).assign(&r_pivot);
+        redraw_segment
+            .row_mut(delta_t)
+            .iter_mut()
+            .for_each(|x| *x += normal.sample(rng));
 
         // Check if HEAD is within the correct tile, otherwise reject move
         let diff_euclidean = &redraw_segment.row(delta_t) - &r_periodicity;
-        let diff_space = system.space().difference( redraw_segment.row(delta_t), r_periodicity );
-
+        let diff_space = system
+            .space()
+            .difference(redraw_segment.row(delta_t), r_periodicity);
         if diff_euclidean != diff_space {
-            debug!("Proposed HEAD {:} is too far from previous periodicity bead (TAIL image).", redraw_segment.row(delta_t));
+            debug!(
+                "Proposed HEAD {:} is too far from previous periodicity bead (TAIL image).",
+                redraw_segment.row(delta_t)
+            );
             debug!("Inverse move does not exist.");
             debug!("Rejecting.");
             return None;
         }
 
-
         // Compute the free-propagator weight
-        let distance_sq = (&r_pivot - &r_periodicity)
+        let distance_sq: f64 = (&r_pivot - &r_periodicity)
             .iter()
             .map(|x| x * x)
             .sum::<f64>();
-        let rho_free = (-distance_sq / (2.0 * sigma_sq )).exp() / (2.0 * sigma_sq * PI).powi( tot_directions as i32 / 2 );
+        let rho_free = (-distance_sq / (2.0 * sigma_sq)).exp()
+            / (2.0 * sigma_sq * PI).powi(tot_directions as i32 / 2);
 
-
-        // Compute the weight for the open move.
-        // Note that we are exploiting the arbitrariness of `open_close_constant` to remove the
-        // density factor
+        // Compute the weight for the open move. Note that we are exploiting the
+        // arbitrariness of `open_close_constant` to remove the density factor
         let weight_open = self.open_close_constant / rho_free;
 
         if delta_t > 1 {
@@ -125,6 +127,7 @@ impl OpenClose {
             levy_staging(&mut redraw_segment, two_lambda_tau, rng);
         }
 
+        // Create update proposal
         let mut proposal = ProposedUpdate::new();
         proposal.add_position_modification(p0, t0..tot_slices, redraw_segment);
         trace!(
@@ -135,6 +138,7 @@ impl OpenClose {
         );
         trace!("\n{:?}", proposal);
 
+        // Compute acceptance ratio
         let acceptance_ratio =
             action.potential_density_matrix_update(system, &proposal) * weight_open;
         trace!("Acceptance ratio: {}", acceptance_ratio);
@@ -189,7 +193,6 @@ impl OpenClose {
         A: PotentialDensityMatrix,
     {
         let worldlines = system.path();
-        //let tot_particles = worldlines.particles();
         let tot_slices = S::WorldLine::TIME_SLICES;
         let tot_directions = S::WorldLine::SPATIAL_DIMENSIONS;
 
@@ -203,20 +206,23 @@ impl OpenClose {
         let head_position = worldlines.position(head, tot_slices - 1);
         let tail = worldlines.worm_tail().unwrap();
         let tail_position = worldlines.position(tail, 0);
+        let pivot_position = worldlines.position(head, t0);
+
         // Get two_lambda_tau value for particle
         let two_lambda_tau = system.two_lambda_tau(head);
 
         // Find TAIL IMAGE that is the closest to HEAD
         let tail_head_distance = system.space().difference(tail_position, head_position);
-        trace!("Vector distance between head and tail (computed by space): {:#?}", tail_head_distance);
+        trace!(
+            "Vector distance between head and tail (computed by space): {:#?}",
+            tail_head_distance
+        );
 
         // Create an Array2 containing the proposed new positions
         let mut redraw_segment = Array2::<f64>::zeros((delta_t + 1, tot_directions));
 
         // Copy the initial bead (head,t0)
-        redraw_segment
-            .row_mut(0)
-            .assign(&worldlines.position(head, t0));
+        redraw_segment.row_mut(0).assign(&pivot_position);
 
         // Set the final (redundancy) bead to the correct image of the tail
         redraw_segment
@@ -224,13 +230,13 @@ impl OpenClose {
             .assign(&(tail_head_distance + head_position));
 
         // Compute the new free-propagator weight
-        let mut distance_sq = 0.0;
-        for i in 0..tot_directions {
-            let dist_i = redraw_segment[[delta_t, i]] - redraw_segment[[0, i]];
-            distance_sq += dist_i * dist_i;
-        }
+        let distance_sq: f64 = (&redraw_segment.row(delta_t) - &pivot_position)
+            .iter()
+            .map(|x| x * x)
+            .sum::<f64>();
         let sigma_sq = two_lambda_tau * delta_t as f64;
-        let rho_free = (-distance_sq / (2.0 * sigma_sq )).exp() / (2.0 * sigma_sq * PI).powi( tot_directions as i32 / 2 );
+        let rho_free = (-distance_sq / (2.0 * sigma_sq)).exp()
+            / (2.0 * sigma_sq * PI).powi(tot_directions as i32 / 2);
 
         // Compute the prefactor for the acceptance probability
         let weight_close = rho_free / self.open_close_constant;
@@ -240,6 +246,7 @@ impl OpenClose {
             levy_staging(&mut redraw_segment, two_lambda_tau, rng);
         }
 
+        // Create update proposal
         let mut proposal = ProposedUpdate::new();
         proposal.add_position_modification(head, t0..tot_slices, redraw_segment);
         trace!(
@@ -250,6 +257,7 @@ impl OpenClose {
         );
         trace!("\n{:?}", proposal);
 
+        // Compute acceptance ratio
         let acceptance_ratio =
             action.potential_density_matrix_update(system, &proposal) * weight_close;
         trace!("Acceptance ratio: {}", acceptance_ratio);
