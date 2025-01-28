@@ -114,7 +114,6 @@ fn main() {
         min_delta_t: M / 3,
         max_delta_t: M - 1,
         open_close_constant: 0.5,
-        max_head_displacement: 1.0,
         accept_count: 0,
         reject_count: 0,
     };

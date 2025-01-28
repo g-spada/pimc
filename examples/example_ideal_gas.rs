@@ -130,7 +130,6 @@ fn main() {
         min_delta_t: upd,
         max_delta_t: upd,
         open_close_constant: DENSITY / N as f64,
-        max_head_displacement: box_side / 2.0,
         accept_count: 0,
         reject_count: 0,
     };

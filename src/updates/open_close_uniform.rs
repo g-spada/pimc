@@ -3,7 +3,6 @@ use super::levy_staging::levy_staging;
 use super::monte_carlo_update::MonteCarloUpdate;
 use super::proposed_update::ProposedUpdate;
 use crate::action::traits::PotentialDensityMatrix;
-use std::f64::consts::PI;
 use crate::path_state::sector::Sector;
 use crate::path_state::traits::{
     WorldLineDimensions, WorldLinePermutationAccess, WorldLinePositionAccess, WorldLineWormAccess,
@@ -12,7 +11,6 @@ use crate::space::traits::Space;
 use crate::system::traits::SystemAccess;
 use log::{debug, trace};
 use ndarray::Array2;
-use rand_distr::{Distribution, Normal};
 
 /// A Monte Carlo update that opens/closes polymer cycles.
 ///
@@ -25,22 +23,28 @@ use rand_distr::{Distribution, Normal};
 /// - `max_delta_t`: The maximum extent of the segment to redraw, in time slices.
 /// - `open_close_constant`: The constant that controls the relative simulation time spent in the
 ///    two sectors
+/// - `max_head_displacement`: The maximum allowed displacement of the worm's head.
 /// - `accept_count`: Tracks the number of updates that have been accepted.
 /// - `reject_count`: Tracks the number of updates that have been rejected.
 ///
 /// # Implementation Details
-/// - The new head is proposed with a free particle distribution. Detailed balance for systems with
-///   periodic boundary conditions is ensured by rejecting updates with head too far away from the
-///   corresponding image of the tail.
-pub struct OpenClose {
+/// - New head is proposed with a uniform distribution within the interval 
+///   [-max_head_displacement, max_head_displacement] for each spatial dimension.
+///
+/// # References
+/// - Condens. Matter 2022, 7, 30, [<http://arxiv.org/abs/2203.00010>]
+///   *Note*: Here we make use of a different definition for the open_close_constant that
+///   incorporates the factor "tot_particles/volume".
+pub struct OpenCloseUniform {
     pub min_delta_t: usize,
     pub max_delta_t: usize,
     pub open_close_constant: f64,
+    pub max_head_displacement: f64,
     pub accept_count: usize,
     pub reject_count: usize,
 }
 
-impl OpenClose {
+impl OpenCloseUniform {
     fn open_polymer<S, A>(
         &mut self,
         system: &mut S,
@@ -77,48 +81,50 @@ impl OpenClose {
             delta_t
         );
 
-        let r_pivot = worldlines.position(p0, t0);
-        let r_periodicity = worldlines.position(p0, tot_slices - 1);
-
-        // Create an Array2 containing the proposed new positions
+        // Create an owned array
         let mut redraw_segment = Array2::<f64>::zeros((delta_t + 1, tot_directions));
         // Copy the initial bead (p0,t0)
         redraw_segment
             .row_mut(0)
-            .assign(&r_pivot);
+            .assign(&worldlines.position(p0, t0));
+        // Copy the final (redundancy) bead (p0,tot_slices-1)
+        redraw_segment
+            .row_mut(delta_t)
+            .assign(&worldlines.position(p0, tot_slices - 1));
 
-        // Propose HEAD bead according to the gaussian free-particle weight
-        let sigma_sq = two_lambda_tau * delta_t as f64;
-        let normal = Normal::new(0.0, sigma_sq.sqrt()).unwrap(); // Normal distribution (mean = 0, std_dev = sigma)
-
+        // Compute the old free-propagator weight
+        let mut square_distance = 0.0;
         for i in 0..tot_directions {
-            redraw_segment[[delta_t, i]] = redraw_segment[[0, i]] + normal.sample(rng);
+            let dist_i = redraw_segment[[delta_t, i]] - redraw_segment[[0, i]];
+            square_distance += dist_i * dist_i;
+        }
+        let rho_free_old = (-square_distance / (2.0 * two_lambda_tau * delta_t as f64)).exp();
+
+        // Propose head (H) by shifting the position of the redundacy bead
+        // in the range [-displacement_bound, displacement_bound] for each spatial direction
+        let displacement_bound = f64::min(
+            (two_lambda_tau * delta_t as f64).sqrt(),
+            self.max_head_displacement,
+        );
+        for i in 0..tot_directions {
+            redraw_segment[[delta_t, i]] += rng.gen_range(-displacement_bound..=displacement_bound);
         }
 
-        // Check if HEAD is within the correct tile, otherwise reject move
-        let diff_euclidean = &redraw_segment.row(delta_t) - &r_periodicity;
-        let diff_space = system.space().difference( redraw_segment.row(delta_t), r_periodicity );
-
-        if diff_euclidean != diff_space {
-            debug!("Proposed HEAD {:} is too far from previous periodicity bead (TAIL image).", redraw_segment.row(delta_t));
-            debug!("Inverse move does not exist.");
-            debug!("Rejecting.");
-            return None;
+        // Compute the new free-propagator weight
+        let mut square_distance = 0.0;
+        for i in 0..tot_directions {
+            let dist_i = redraw_segment[[delta_t, i]] - redraw_segment[[0, i]];
+            square_distance += dist_i * dist_i;
         }
-
-
-        // Compute the free-propagator weight
-        let distance_sq = (&r_pivot - &r_periodicity)
-            .iter()
-            .map(|x| x * x)
-            .sum::<f64>();
-        let rho_free = (-distance_sq / (2.0 * sigma_sq )).exp() / (2.0 * sigma_sq * PI).powi( tot_directions as i32 / 2 );
-
+        let rho_free_new = (-square_distance / (2.0 * two_lambda_tau * delta_t as f64)).exp();
 
         // Compute the weight for the open move.
         // Note that we are exploiting the arbitrariness of `open_close_constant` to remove the
         // density factor
-        let weight_open = self.open_close_constant / rho_free;
+        let weight_open = self.open_close_constant
+            * (2.0 * displacement_bound).powi(tot_directions as i32)
+            * rho_free_new
+            / rho_free_old;
 
         if delta_t > 1 {
             // Apply staging on the segment
@@ -205,12 +211,31 @@ impl OpenClose {
         let tail_position = worldlines.position(tail, 0);
         // Get two_lambda_tau value for particle
         let two_lambda_tau = system.two_lambda_tau(head);
+        // Check if TAIL and HEAD are close enough
+        // i.e. within [-displacement_bound, displacement_bound] for each spatial direction
+        let displacement_bound = f64::min(
+            (two_lambda_tau * delta_t as f64).sqrt(),
+            self.max_head_displacement,
+        );
 
-        // Find TAIL IMAGE that is the closest to HEAD
         let tail_head_distance = system.space().difference(tail_position, head_position);
         trace!("Vector distance between head and tail (computed by space): {:#?}", tail_head_distance);
 
-        // Create an Array2 containing the proposed new positions
+        if tail_head_distance
+            .iter()
+            .any(|&l| l.abs() > displacement_bound)
+        {
+            trace!(
+                "Head ({:}) and Tail ({:}) are too far apart. Distance is {:} with bound {:}",
+                head,
+                tail,
+                tail_head_distance,
+                displacement_bound
+            );
+            return None;
+        }
+
+        // Create an owned array
         let mut redraw_segment = Array2::<f64>::zeros((delta_t + 1, tot_directions));
 
         // Copy the initial bead (head,t0)
@@ -223,17 +248,25 @@ impl OpenClose {
             .row_mut(delta_t)
             .assign(&(tail_head_distance + head_position));
 
+        // Compute the old free-propagator weight
+        let mut square_distance = 0.0;
+        for i in 0..tot_directions {
+            let dist_i = head_position[i] - redraw_segment[[0, i]];
+            square_distance += dist_i * dist_i;
+        }
+        let rho_free_old = (-square_distance / (2.0 * two_lambda_tau * delta_t as f64)).exp();
+
         // Compute the new free-propagator weight
-        let mut distance_sq = 0.0;
+        let mut square_distance = 0.0;
         for i in 0..tot_directions {
             let dist_i = redraw_segment[[delta_t, i]] - redraw_segment[[0, i]];
-            distance_sq += dist_i * dist_i;
+            square_distance += dist_i * dist_i;
         }
-        let sigma_sq = two_lambda_tau * delta_t as f64;
-        let rho_free = (-distance_sq / (2.0 * sigma_sq )).exp() / (2.0 * sigma_sq * PI).powi( tot_directions as i32 / 2 );
+        let rho_free_new = (-square_distance / (2.0 * two_lambda_tau * delta_t as f64)).exp();
 
         // Compute the prefactor for the acceptance probability
-        let weight_close = rho_free / self.open_close_constant;
+        let weight_close = (rho_free_new / rho_free_old)
+            / (self.open_close_constant * (2.0 * displacement_bound).powi(tot_directions as i32));
 
         if delta_t > 1 {
             // Apply staging on the segment
@@ -289,7 +322,7 @@ impl OpenClose {
     }
 }
 
-impl<S, A> MonteCarloUpdate<S, A> for OpenClose
+impl<S, A> MonteCarloUpdate<S, A> for OpenCloseUniform
 where
     S: SystemAccess,
     S::WorldLine: WorldLineDimensions
