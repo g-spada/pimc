@@ -10,3 +10,7 @@ pub trait SystemAccess {
     fn path(&self) -> &Self::WorldLine;
     fn path_mut(&mut self) -> &mut Self::WorldLine;
 }
+
+pub trait ReseatPolymer {
+    fn reseat_polymer(&mut self, particle: usize);
+}
