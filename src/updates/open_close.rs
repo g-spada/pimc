@@ -220,6 +220,8 @@ impl OpenClose {
         );
 
         let tail_head_distance = system.space().difference(tail_position, head_position);
+        trace!("Vector distance between head and tail (computed by space): {:#?}", tail_head_distance);
+
         if tail_head_distance
             .iter()
             .any(|&l| l.abs() > displacement_bound)

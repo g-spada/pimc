@@ -23,7 +23,7 @@ use std::f64::consts::PI;
 ///   goes from 0 to npart included. The k=0 terms are canonically set to 1 and 0 respectively.
 ///   - Values of dz/d\beta are given in units of kB*Tc0
 ///
-/// # Implementation details
+/// # Implementation Details
 /// * Raw (unoptimized) version that sums all the values without exploiting symmetries.
 /// * For test purposes.
 fn single_particle_z_dz_raw(

@@ -528,7 +528,7 @@ impl<const N: usize, const M: usize, const D: usize> Worm<N, M, D> {
     /// Gets the sector for a given particle.
     ///
     /// # Returns
-    /// A reference to the `Sector` of the worldline.
+    /// The `Sector` of the worldline.
     pub fn sector(&self) -> Sector {
         if self.worm_tail.is_some() {
             debug_assert!(self.worm_head.is_some(), "Headless worm!");
