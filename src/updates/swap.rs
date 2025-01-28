@@ -25,8 +25,8 @@ use rand_distr::Distribution;
 /// - `reject_count`: Tracks the number of updates that have been rejected.
 ///
 /// # Implementation Details
-/// * It takes into account the space periodicity to satisfy the detailed balance condition.
-/// * It doesn't require the polymers to have the initial slice within the fundamental cell.
+/// - It takes into account the space periodicity to satisfy the detailed balance condition.
+/// - It doesn't require the polymers to have the initial slice within the fundamental cell.
 pub struct Swap {
     /// The minimum extent of the segment to redraw, in time slices.
     /// Must be greater than 1.
