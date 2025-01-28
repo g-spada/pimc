@@ -20,6 +20,7 @@ use pimc::updates::swap::Swap;
 use pimc::updates::worm_translate::WormTranslate;
 use pimc::utils::accumulator::Accumulator;
 use pimc::utils::consts::ZETA_3_2;
+use pimc::utils::ideal_bosons::ideal_gas_energy;
 use rand::distributions::{Distribution, WeightedIndex};
 use std::f64::consts::PI;
 
@@ -306,4 +307,6 @@ fn main() {
         "Energy virial estimator (mean, err, autocorr, std_dev)\n{:#?}",
         virial_acc.statistics()
     );
+
+    println!("COMPARE WITH EXACT VALUE: {}", ideal_gas_energy(N, T_OVER_TC0));
 }

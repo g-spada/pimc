@@ -233,6 +233,17 @@ pub fn compute_ln_partition_functions(
     (ln_partition_function, deriv_ln_partition_function)
 }
 
+/// Compute the energy per particle for a system of ideal bosons
+///
+/// # Returns
+/// - The energy per particle in units of Tc0
+pub fn ideal_gas_energy(particles: usize, t_over_tc0: f64) -> f64 {
+    let (z1, dz1) = single_particle_z_dz(particles, t_over_tc0);
+    let (_lnz, dlnz) = compute_ln_partition_functions(z1, dz1);
+    let energy = -dlnz[particles] / particles as f64;
+    return energy;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
