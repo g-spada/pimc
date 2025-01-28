@@ -80,7 +80,7 @@ where
             .assign(&worldlines.position(head, t0));
 
         // Propose head bead according to the gaussian free-particle weight
-        let sigma = two_lambda_tau * delta_t as f64;
+        let sigma = (two_lambda_tau * delta_t as f64).sqrt();
         let normal = Normal::new(0.0, sigma).unwrap(); // Normal distribution (mean = 0, std_dev = sigma)
 
         for i in 0..tot_directions {

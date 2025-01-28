@@ -16,13 +16,17 @@ use crate::system::traits::SystemAccess;
 use rand::distributions::WeightedIndex;
 use rand_distr::Distribution;
 
-/// A Monte Carlo update glues another polymer to the head of the worm, thus sampling permutations.
+/// A Monte Carlo update that glues a polymer to the tail of the worm, thus sampling permutations.
 ///
 /// # Fields
-/// - `min_delta_t`: The minimum length (in time slices) of a segment to redraw. Must be greater than 1.
-/// - `max_delta_t`: The maximum length (in time slices) of a segment to redraw. Must be greater than or equal to `min_delta_t`.
+/// - `min_delta_t`: Minimum time slices to redraw. Must be greater than 1.
+/// - `max_delta_t`: Maximum time slices to redraw. Must be greater than or equal to `min_delta_t`.
 /// - `accept_count`: Tracks the number of updates that have been accepted.
 /// - `reject_count`: Tracks the number of updates that have been rejected.
+///
+/// # Implementation Details
+/// * It takes into account the space periodicity to satisfy the detailed balance condition.
+/// * It doesn't require the polymers to have the initial slice within the fundamental cell.
 pub struct Swap {
     /// The minimum extent of the segment to redraw, in time slices.
     /// Must be greater than 1.
@@ -57,10 +61,10 @@ where
     ) -> Option<AcceptedUpdate> {
         debug!("Trying update");
 
-        let worldlines = system.path();
-        //let tot_particles = worldlines.particles();
         let tot_slices = S::WorldLine::TIME_SLICES;
         let tot_directions = S::WorldLine::SPATIAL_DIMENSIONS;
+        let worldlines = system.path();
+        let tot_particles = worldlines.particles();
         // Find head of the worm
         let tail = if let Some(tail) = worldlines.worm_tail() {
             tail
@@ -79,25 +83,41 @@ where
         // Get two_lambda_tau value for particle
         let two_lambda_tau = system.two_lambda_tau(tail);
 
-        // Nearest images
-        let nearest_images = system.space().differences_from_reference(
-            worldlines.positions_at_time_slice(t0),
-            worldlines.position(tail, 0),
-        );
-        trace!("Distances at pivot slice T{}:\n{:?}", t0, nearest_images);
+        // Compute the differences from each polymer at slice `t0` to the image of the tail that is
+        // closer to the periodicity slice `tot_slices - 1`.
+        // Find closest image of the tail
+        let closest_tail_image = &worldlines.positions_at_time_slice(tot_slices - 1)
+            - system.space().differences_from_reference(
+                worldlines.positions_at_time_slice(tot_slices - 1),
+                worldlines.position(tail, 0),
+            );
 
         // Compute the weights
-        let mut weights: Array1<f64> = nearest_images
+        let mut weights: Array1<f64> = worldlines
+            .positions_at_time_slice(t0)
             .outer_iter()
-            .map(|row| {
-                let distance_sq = row.iter().map(|x| x * x).sum::<f64>();
+            .zip(closest_tail_image.outer_iter())
+            .map(|(r_pivot, r_tail)| {
+                debug_assert_eq!(
+                    r_tail.len(),
+                    tot_directions,
+                    "weights: row size must be {}, found {}",
+                    tot_directions,
+                    r_pivot.len()
+                );
+                let diff = &r_pivot - &r_tail;
+                let distance_sq = diff.iter().map(|x| x * x).sum::<f64>();
                 //let distance_sq = norm_l2(&row); // Compute Euclidean modulus (L2 norm)
                 (-distance_sq / (2.0 * two_lambda_tau * delta_t as f64)).exp()
             })
             .collect();
         weights[head] = 0.0;
         trace!("Weights: {:?}", weights);
-        let sum_weights = weights.sum();
+        let sum_weights: f64 = weights.sum();
+        if !sum_weights.is_normal() {
+            debug!("Invalid weights. Not possible to swap.");
+            return None;
+        }
 
         // Select the particle by tower sampling from the discrete probability distribution given by
         // weights
@@ -106,21 +126,27 @@ where
         trace!("Selected P{}, from pivot slice T{}", p0, t0,);
 
         // Compute weight from inverse move
-        // Nearest images of the selected particle
-        let nearest_images_p0 = system.space().differences_from_reference(
-            worldlines.positions_at_time_slice(t0),
-            worldlines.position(p0, 0),
-        );
-        weights = nearest_images_p0
-            .outer_iter()
-            .map(|row| {
-                let distance_sq = row.iter().map(|x| x * x).sum::<f64>();
-                //let distance_sq = norm_l2(&row); // Compute Euclidean modulus (L2 norm)
-                (-distance_sq / (2.0 * two_lambda_tau * delta_t as f64)).exp()
-            })
-            .collect();
-        weights[head] = 0.0;
-        let sum_weights_p0 = weights.sum();
+        let tail_new = worldlines.following(p0).unwrap(); // Cannot fail: p0 is not head
+        let mut sum_weights_inverse: f64 = 0.0;
+        for particle in 0..tot_particles {
+            if particle != head {
+                let r_periodicity = worldlines.position(particle, tot_slices - 1);
+                let r_tail_new = worldlines.position(tail_new, 0);
+                let r_tail_image =
+                    &r_periodicity - &system.space().difference(r_periodicity, r_tail_new);
+                let r_pivot = worldlines.position(particle, t0);
+                let distance_sq = (&r_pivot - &r_tail_image)
+                    .iter()
+                    .map(|x| x * x)
+                    .sum::<f64>();
+                sum_weights_inverse +=
+                    (-distance_sq / (2.0 * two_lambda_tau * delta_t as f64)).exp();
+            }
+        }
+        if !sum_weights_inverse.is_normal() {
+            debug!("Invalid inverse weights. Not possible to swap.");
+            return None;
+        }
 
         let mut redraw_segment = Array2::<f64>::zeros((delta_t + 1, tot_directions));
         // Copy the initial bead (p0,t0)
@@ -131,7 +157,13 @@ where
         // Final bead: glue to previous tail
         redraw_segment
             .row_mut(delta_t)
-            .assign(&(&worldlines.position(p0, t0) - &nearest_images.row(p0)));
+            .assign(&closest_tail_image.row(p0));
+
+        debug_assert!(system
+            .space()
+            .difference(redraw_segment.row(delta_t), worldlines.position(tail, 0))
+            .iter()
+            .all(|delta_r| delta_r.abs() < 1e-10));
 
         // We now redraw the segment t0..tot_slices with levy
         if delta_t > 1 {
@@ -148,7 +180,7 @@ where
 
         let acceptance_ratio = action.potential_density_matrix_update(system, &proposal)
             * sum_weights
-            / sum_weights_p0;
+            / sum_weights_inverse;
         trace!("Acceptance ratio: {}", acceptance_ratio);
 
         // Apply Metropolis-Hastings acceptance criterion
@@ -173,14 +205,13 @@ where
             debug!("Move accepted");
 
             // Update the permutations
-            let broken_link = worldlines_mut.following(p0).unwrap(); // Can not fail: p0 is not head
             worldlines_mut.set_following(p0, Some(tail));
             worldlines_mut.set_preceding(tail, Some(p0));
-            worldlines_mut.set_preceding(broken_link, None);
+            worldlines_mut.set_preceding(tail_new, None); // New tail
             debug_assert!(
-                worldlines_mut.worm_tail() == Some(broken_link),
+                worldlines_mut.worm_tail() == Some(tail_new),
                 "Expected new tail {}, found {}",
-                broken_link,
+                tail_new,
                 worldlines_mut.worm_tail().unwrap()
             );
 
