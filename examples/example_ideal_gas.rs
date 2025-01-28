@@ -31,9 +31,9 @@ const MP1: usize = M + 1;
 const T_OVER_TC0: f64 = 1.0;
 const DENSITY: f64 = 1e-4;
 
-const SWEEPS: usize = 2_usize.pow(24);
-const WARMUP: usize = 2_usize.pow(23);
-const MEASURE_EVERY: usize = 16;
+const SWEEPS: u64 = 2_usize.pow(24);
+const WARMUP: u64 = 2_usize.pow(23);
+const MEASURE_EVERY: u32 = 16;
 
 const TARGET_NZ_NG_RATIO: f64 = 1.0;
 
