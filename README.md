@@ -1,13 +1,18 @@
-# pimc
+pimc
+====
 
-A Rust-based scientific computing library for Path Integral Monte Carlo (PIMC) simulations.
+[![Rust](https://github.com/g-spada/pimc/workflows/rust.yml/badge.svg)](https://github.com/g-spada/pimc/actions)
 
-## Features
+Scientific computing library for Path Integral Monte Carlo (PIMC) simulations.
+
+### Warning
+
+This library is currently under heavy development. Interfaces may change at any time.
+
+### Highlights
 
 - Designed for extensibility and high performance.
 
-## Getting Started
+### License
 
-- Build: `cargo build`
-- Run: `cargo run`
-- Test: `cargo test`
+Licensed under MIT license ([LICENSE](LICENSE) or https://choosealicense.com/licenses/mit/).

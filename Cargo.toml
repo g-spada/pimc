@@ -2,6 +2,7 @@
 name = "pimc"
 version = "0.1.0"
 edition = "2021"
+authors = ["g-spada <gabcloud@pm.me>"]
 license = "MIT"
 
 [dependencies]
