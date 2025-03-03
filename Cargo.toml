@@ -3,6 +3,8 @@ name = "pimc"
 version = "0.1.0"
 edition = "2021"
 authors = ["g-spada <gabcloud@pm.me>"]
+description = "Scientific computing library for Path Integral Monte Carlo (PIMC) simulations."
+repository = "https://github.com/g-spada/pimc"
 license = "MIT"
 
 [dependencies]
