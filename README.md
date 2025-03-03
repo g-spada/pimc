@@ -1,7 +1,7 @@
 pimc
 ====
 
-[![Rust](https://github.com/g-spada/pimc/workflows/rust.yml/badge.svg)](https://github.com/g-spada/pimc/actions)
+[![Rust](https://github.com/g-spada/pimc/actions/workflows/rust.yml/badge.svg)](https://github.com/g-spada/pimc/actions)
 
 Scientific computing library for Path Integral Monte Carlo (PIMC) simulations.
 
