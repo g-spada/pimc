@@ -21,7 +21,7 @@ pub struct WormTranslate {
 impl WormTranslate {
     fn select_initial_particle<W>(&self, worldlines: &W, rng: &mut impl rand::Rng) -> usize
     where
-        W: WorldLinePermutationAccess + WorldLineWormAccess + WorldLinePositionAccess,
+        W: WorldLinePermutationAccess + WorldLineWormAccess + WorldLineDimensions,
     {
         let mut p0: usize = rng.gen_range(0..worldlines.particles());
         if worldlines.sector() == Sector::G {

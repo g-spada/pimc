@@ -3,17 +3,18 @@ use ndarray::{Array2, ArrayView1, ArrayView2, ArrayViewMut1, ArrayViewMut2};
 
 /// Trait for querying the dimensional properties of worldlines.
 pub trait WorldLineDimensions {
+    /// Number of imaginary-time slices
     const TIME_SLICES: usize;
 
     /// Space dimensionality.
     const SPATIAL_DIMENSIONS: usize;
+
+    /// Returns the number of particles in the system.
+    fn particles(&self) -> usize;
 }
 
 /// Trait for accessing and modifying particle positions in worldlines.
 pub trait WorldLinePositionAccess {
-    /// Returns the number of particles in the system.
-    fn particles(&self) -> usize;
-
     /// Number of time slices in the system.
     /// Gets a view of the position of a specific particle at a specific time slice.
     fn position(&self, particle: usize, time_slice: usize) -> ArrayView1<f64>;

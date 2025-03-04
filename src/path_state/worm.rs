@@ -566,14 +566,14 @@ impl<const N: usize, const M: usize, const D: usize> WorldLineDimensions for Wor
 
     /// The number of spatial dimensions.
     const SPATIAL_DIMENSIONS: usize = D;
-}
 
-impl<const N: usize, const M: usize, const D: usize> WorldLinePositionAccess for Worm<N, M, D> {
     /// Returns the number of particles in the system.
     fn particles(&self) -> usize {
         self.particles()
     }
+}
 
+impl<const N: usize, const M: usize, const D: usize> WorldLinePositionAccess for Worm<N, M, D> {
     /// Gets a view of the position of a specific particle at a specific time slice.
     fn position(&self, particle: usize, time_slice: usize) -> ArrayView1<f64> {
         self.position(particle, time_slice)

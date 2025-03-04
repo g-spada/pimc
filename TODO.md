@@ -1,7 +1,7 @@
 ## To Do
 
 * WorldLines:
-    * particle method should be moved to WorldLineDimensions
+    * ~~particle method should be moved to WorldLineDimensions~~
     * const PARTICLES?
 * Improve ProposedUpdate design
 * Action:

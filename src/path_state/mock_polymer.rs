@@ -34,13 +34,12 @@ mod tests {
     impl WorldLineDimensions for MockPolymer {
         const TIME_SLICES: usize = 10;
         const SPATIAL_DIMENSIONS: usize = 2;
-    }
-
-    impl WorldLinePositionAccess for MockPolymer {
         fn particles(&self) -> usize {
             2
         }
+    }
 
+    impl WorldLinePositionAccess for MockPolymer {
         fn position(&self, particle: usize, time_slice: usize) -> ArrayView1<f64> {
             self.positions.slice(s![particle, time_slice, ..])
         }
