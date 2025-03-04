@@ -2,7 +2,7 @@ use env_logger::Builder;
 use log::info;
 //use ndarray::{Array1, ArrayView1};
 use pimc::action::traits::PotentialDensityMatrix;
-use pimc::path_state::worm::Worm;
+use pimc::path_state::path_configuration::PathConfiguration;
 use pimc::space::free_space::FreeSpace;
 //use pimc::space::periodic_box::PeriodicBox;
 use pimc::system::homonuclear_system::HomonuclearSystem;
@@ -47,7 +47,7 @@ fn main() {
 
     info!("Starting Example");
     // Create path object
-    let mut path = Worm::<N, MP1, D>::new();
+    let mut path = PathConfiguration::<N, MP1, D>::new();
     // Create a worm of length two: (T) - 0 - 2 - (H)
     path.set_preceding(0, None);
     path.set_following(0, Some(2));

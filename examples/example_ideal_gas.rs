@@ -4,8 +4,8 @@ use env_logger::Builder;
 use log::{debug, info};
 use ndarray::Zip;
 use pimc::action::traits::PotentialDensityMatrix;
+use pimc::path_state::path_configuration::PathConfiguration;
 use pimc::path_state::sector::Sector;
-use pimc::path_state::worm::Worm;
 use pimc::space::periodic_box::PeriodicBox;
 use pimc::system::homonuclear_system::HomonuclearSystem;
 use pimc::system::traits::{ReseatPolymer, SystemAccess};
@@ -61,7 +61,7 @@ fn main() {
     info!("N = {:.2}", N);
     info!("M = {:.2}", M);
     //// Create path object
-    //let mut path = Worm::<N, MP1, D>::new();
+    //let mut path = PathConfiguration::<N, MP1, D>::new();
 
     let box_side: f64 = (N as f64 / DENSITY).powf(1.0 / D as f64);
     let tc0: f64 = 4.0 * PI * (DENSITY / ZETA_3_2).powf(2.0 / 3.0);
@@ -79,7 +79,7 @@ fn main() {
     let mut system = HomonuclearSystem {
         //space: flatlandia,
         space: periodic_box,
-        path: Worm::<N, MP1, D>::new(),
+        path: PathConfiguration::<N, MP1, D>::new(),
         //two_lambda_tau: (ZETA_3_2 / DENSITY).powf(2.0 / 3.0) / (2.0 * PI * T_OVER_TC0 * M as f64),
         two_lambda_tau: 2.0 * tau,
     };
@@ -308,5 +308,8 @@ fn main() {
         virial_acc.statistics()
     );
 
-    println!("COMPARE WITH EXACT VALUE: {}", ideal_gas_energy(N, T_OVER_TC0));
+    println!(
+        "COMPARE WITH EXACT VALUE: {}",
+        ideal_gas_energy(N, T_OVER_TC0)
+    );
 }

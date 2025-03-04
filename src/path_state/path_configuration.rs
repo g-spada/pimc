@@ -11,14 +11,14 @@ use serde_json;
 use std::fs::File;
 use std::io::{self, BufReader, BufWriter};
 
-/// Worm struct to store particle positions using ndarray.
+/// PathConfiguration struct to store particle positions using ndarray.
 ///
 /// # Example
 /// ```
-/// use pimc::path_state::worm::Worm;
+/// use pimc::path_state::path_configuration::PathConfiguration;
 ///
-/// // Create a new Worm instance
-/// let mut world = Worm::<2,3,3>::new(); // 2 particles, 3 time slices, 3D space
+/// // Create a new PathConfiguration instance
+/// let mut world = PathConfiguration::<2,3,3>::new(); // 2 particles, 3 time slices, 3D space
 ///
 /// // Set the position of the first particle at the first time slice
 /// world.set_position(0, 0, &[1.0, 2.0, 3.0]);
@@ -29,7 +29,7 @@ use std::io::{self, BufReader, BufWriter};
 /// ```
 ///
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Worm<const N: usize, const M: usize, const D: usize> {
+pub struct PathConfiguration<const N: usize, const M: usize, const D: usize> {
     /// Multidimensional array with const generics dimensions
     /// (N particles, M time slices, D spatial dimensions).
     positions: Array3<f64>,
@@ -41,8 +41,8 @@ pub struct Worm<const N: usize, const M: usize, const D: usize> {
 }
 
 #[allow(clippy::new_without_default)]
-impl<const N: usize, const M: usize, const D: usize> Worm<N, M, D> {
-    /// Creates a new `Worm` instance with all positions initialized to zero.
+impl<const N: usize, const M: usize, const D: usize> PathConfiguration<N, M, D> {
+    /// Creates a new `PathConfiguration` instance with all positions initialized to zero.
     pub fn new() -> Self {
         Self {
             positions: Array::zeros((N, M, D)),
@@ -65,10 +65,10 @@ impl<const N: usize, const M: usize, const D: usize> Worm<N, M, D> {
     ///
     /// # Example
     /// ```
-    /// use pimc::path_state::worm::Worm;
+    /// use pimc::path_state::path_configuration::PathConfiguration;
     /// use ndarray::array;
     ///
-    /// let mut world = Worm::<2, 3, 3>::new();
+    /// let mut world = PathConfiguration::<2, 3, 3>::new();
     ///
     /// // Initialize positions with a simple function
     /// world.initialize_positions(|particle| vec![particle as f64; 3]);
@@ -99,7 +99,7 @@ impl<const N: usize, const M: usize, const D: usize> Worm<N, M, D> {
         }
     }
 
-    /// Saves the `Worm` instance to a file in JSON format.
+    /// Saves the `PathConfiguration` instance to a file in JSON format.
     ///
     /// # Arguments
     /// * `filename` - Path to the output JSON file.
@@ -114,7 +114,7 @@ impl<const N: usize, const M: usize, const D: usize> Worm<N, M, D> {
         Ok(())
     }
 
-    /// Loads a `Worm` instance from a JSON file.
+    /// Loads a `PathConfiguration` instance from a JSON file.
     ///
     /// # Arguments
     /// * `filename` - Path to the input JSON file.
@@ -260,10 +260,10 @@ impl<const N: usize, const M: usize, const D: usize> Worm<N, M, D> {
     ///
     /// # Example
     /// ```
-    /// use pimc::path_state::worm::Worm;
+    /// use pimc::path_state::path_configuration::PathConfiguration;
     /// use ndarray::array;
     ///
-    /// let mut world = Worm::<2,5,3>::new(); // 2 particles, 5 time slices, 3D space
+    /// let mut world = PathConfiguration::<2,5,3>::new(); // 2 particles, 5 time slices, 3D space
     /// world.set_position(0, 0, &[1.0, 2.0, 3.0]);
     /// world.set_position(0, 1, &[4.0, 5.0, 6.0]);
     ///
@@ -356,10 +356,10 @@ impl<const N: usize, const M: usize, const D: usize> Worm<N, M, D> {
     ///
     /// # Example
     /// ```
-    /// use pimc::path_state::worm::Worm;
+    /// use pimc::path_state::path_configuration::PathConfiguration;
     /// use ndarray::array;
     ///
-    /// let mut world = Worm::<2,5,3>::new(); // 2 particles, 5 time slices, 3D space
+    /// let mut world = PathConfiguration::<2,5,3>::new(); // 2 particles, 5 time slices, 3D space
     ///
     /// // Set positions for slices 0 to 2 (exclusive) for particle 0
     /// let new_positions = array![[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]];
@@ -560,7 +560,9 @@ impl<const N: usize, const M: usize, const D: usize> Worm<N, M, D> {
     }
 }
 
-impl<const N: usize, const M: usize, const D: usize> WorldLineDimensions for Worm<N, M, D> {
+impl<const N: usize, const M: usize, const D: usize> WorldLineDimensions
+    for PathConfiguration<N, M, D>
+{
     /// The number of time slices in the system.
     const TIME_SLICES: usize = M;
 
@@ -573,7 +575,9 @@ impl<const N: usize, const M: usize, const D: usize> WorldLineDimensions for Wor
     }
 }
 
-impl<const N: usize, const M: usize, const D: usize> WorldLinePositionAccess for Worm<N, M, D> {
+impl<const N: usize, const M: usize, const D: usize> WorldLinePositionAccess
+    for PathConfiguration<N, M, D>
+{
     /// Gets a view of the position of a specific particle at a specific time slice.
     fn position(&self, particle: usize, time_slice: usize) -> ArrayView1<f64> {
         self.position(particle, time_slice)
@@ -616,7 +620,9 @@ impl<const N: usize, const M: usize, const D: usize> WorldLinePositionAccess for
     }
 }
 
-impl<const N: usize, const M: usize, const D: usize> WorldLinePermutationAccess for Worm<N, M, D> {
+impl<const N: usize, const M: usize, const D: usize> WorldLinePermutationAccess
+    for PathConfiguration<N, M, D>
+{
     /// Gets the index of the preceding particle in the polymer.
     fn preceding(&self, particle: usize) -> Option<usize> {
         self.preceding(particle)
@@ -638,7 +644,9 @@ impl<const N: usize, const M: usize, const D: usize> WorldLinePermutationAccess 
     }
 }
 
-impl<const N: usize, const M: usize, const D: usize> WorldLineWormAccess for Worm<N, M, D> {
+impl<const N: usize, const M: usize, const D: usize> WorldLineWormAccess
+    for PathConfiguration<N, M, D>
+{
     /// Gets the index of the worm head, if it exists.
     fn worm_head(&self) -> Option<usize> {
         self.worm_head()
@@ -655,7 +663,9 @@ impl<const N: usize, const M: usize, const D: usize> WorldLineWormAccess for Wor
     }
 }
 
-impl<const N: usize, const M: usize, const D: usize> WorldLineBatchPositions for Worm<N, M, D> {
+impl<const N: usize, const M: usize, const D: usize> WorldLineBatchPositions
+    for PathConfiguration<N, M, D>
+{
     /// Returns a 2D view of the positions of all particles at a specific time slice.
     fn positions_at_time_slice(&self, time_slice: usize) -> ArrayView2<f64> {
         // Validate the time slice index
@@ -679,13 +689,13 @@ mod tests {
     #[test]
     fn test_new_worm() {
         // Test valid initialization
-        let world = Worm::<2, 3, 3>::new(); // 2 particles, 3 time slices, 3D
+        let world = PathConfiguration::<2, 3, 3>::new(); // 2 particles, 3 time slices, 3D
         assert_eq!(world.positions.shape(), &[2, 3, 3]);
     }
 
     #[test]
     fn test_position() {
-        let mut world = Worm::<2, 3, 3>::new();
+        let mut world = PathConfiguration::<2, 3, 3>::new();
         world.set_position(0, 0, &[1.0, 2.0, 3.0]);
 
         // Retrieve position
@@ -699,7 +709,7 @@ mod tests {
 
     #[test]
     fn test_position_mut() {
-        let mut world = Worm::<2, 3, 3>::new();
+        let mut world = PathConfiguration::<2, 3, 3>::new();
         {
             // Modify position using mutable reference
             let mut position = world.position_mut(0, 0);
@@ -714,13 +724,13 @@ mod tests {
     #[test]
     #[should_panic]
     fn test_invalid_arguments_position_mut() {
-        let mut world = Worm::<2, 3, 2>::new();
+        let mut world = PathConfiguration::<2, 3, 2>::new();
         world.position_mut(1, 3);
     }
 
     #[test]
     fn test_positions() {
-        let mut world = Worm::<2, 5, 3>::new(); // 2 particles, 5 time slices, 3D space
+        let mut world = PathConfiguration::<2, 5, 3>::new(); // 2 particles, 5 time slices, 3D space
 
         // Set positions for particle 0, slices 0 to 2
         world.set_position(0, 0, &[1.0, 2.0, 3.0]);
@@ -733,7 +743,7 @@ mod tests {
 
     #[test]
     fn test_set_positions() {
-        let mut world = Worm::<2, 5, 3>::new(); // 2 particles, 5 time slices, 3D space
+        let mut world = PathConfiguration::<2, 5, 3>::new(); // 2 particles, 5 time slices, 3D space
 
         // Create a 2D array with new positions for slices 0 to 2
         let new_positions = array![
@@ -754,7 +764,7 @@ mod tests {
         const NP: usize = 4;
         const NS: usize = 16;
         const ND: usize = 3;
-        let mut world = Worm::<NP, NS, ND>::new();
+        let mut world = PathConfiguration::<NP, NS, ND>::new();
 
         // Worldlines are initialized in the Z sector with all 1-cycle permutations
         for i in 0..NP {
@@ -780,7 +790,7 @@ mod tests {
 
     #[test]
     fn test_save_and_load_json_temp() -> io::Result<()> {
-        let mut world = Worm::<2, 3, 3>::new();
+        let mut world = PathConfiguration::<2, 3, 3>::new();
         world.set_position(0, 0, &[1.0, 2.0, 3.0]);
 
         // Use a temporary file for saving
@@ -789,7 +799,8 @@ mod tests {
         world.save_to_file(temp_file.path().to_str().unwrap())?;
 
         // Load from the temporary file
-        let loaded_world = Worm::<2, 3, 3>::load_from_file(temp_file.path().to_str().unwrap())?;
+        let loaded_world =
+            PathConfiguration::<2, 3, 3>::load_from_file(temp_file.path().to_str().unwrap())?;
 
         // Verify the data
         assert_eq!(loaded_world.position(0, 0), array![1.0, 2.0, 3.0]);
