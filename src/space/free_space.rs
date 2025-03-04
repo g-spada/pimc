@@ -5,6 +5,7 @@ pub struct FreeSpace<const D: usize>;
 
 impl<const D: usize> Space for FreeSpace<D> {
     const SPATIAL_DIMENSIONS: usize = D;
+    const PERIODIC: bool = false;
 
     fn volume(&self) -> f64 {
         // FOR TEST PURPOSES ONLY

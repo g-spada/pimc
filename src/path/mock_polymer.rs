@@ -1,11 +1,13 @@
 #[cfg(test)]
 mod tests {
-    use crate::path_state::sector::Sector;
-    use crate::path_state::traits::{
+    use crate::path::sector::Sector;
+    use crate::path::traits::{
         WorldLineDimensions, WorldLinePermutationAccess, WorldLinePositionAccess,
         WorldLineWormAccess,
     };
-    use ndarray::{s, array, Array1, Array2, Array3, ArrayView1, ArrayView2, ArrayViewMut1, ArrayViewMut2};
+    use ndarray::{
+        array, s, Array1, Array2, Array3, ArrayView1, ArrayView2, ArrayViewMut1, ArrayViewMut2,
+    };
 
     /// Mock struct for a 2D polymer worldline.
     pub struct MockPolymer {
@@ -98,9 +100,8 @@ mod tests {
             self.preceding[particle]
         }
 
-
         fn set_preceding(&mut self, particle: usize, preceding: Option<usize>) {
-                self.preceding[particle] = preceding;
+            self.preceding[particle] = preceding;
         }
 
         fn following(&self, particle: usize) -> Option<usize> {
@@ -108,7 +109,7 @@ mod tests {
         }
 
         fn set_following(&mut self, particle: usize, following: Option<usize>) {
-                self.following[particle] = following;
+            self.following[particle] = following;
         }
     }
 

@@ -3,6 +3,7 @@ use ndarray::{Array1, Array2, ArrayView1, ArrayView2};
 /// Trait for working with spatial boundaries and distances.
 pub trait Space {
     const SPATIAL_DIMENSIONS: usize;
+    const PERIODIC: bool;
 
     /// D-dimensional volume of the space
     fn volume(&self) -> f64;
@@ -24,11 +25,12 @@ pub trait Space {
     where
         A: Into<ArrayView1<'a, f64>>,
         B: Into<ArrayView1<'a, f64>>;
-}
 
-pub trait BaseImage {
     /// Get the point's base image within the fundamental simulation cell.
     fn base_image<'a, A>(&self, r: A) -> Array1<f64>
     where
-        A: Into<ArrayView1<'a, f64>>;
+        A: Into<ArrayView1<'a, f64>>,
+    {
+        r.into().to_owned()
+    }
 }

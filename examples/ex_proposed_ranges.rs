@@ -1,5 +1,5 @@
 use ndarray::{array, s};
-use pimc::updates::proposed_update::ProposedUpdate;
+use pimc::monte_carlo::proposed_update::ProposedUpdate;
 
 fn main() {
     let mut updates = ProposedUpdate::new();

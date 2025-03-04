@@ -1,5 +1,5 @@
-use super::traits::{BaseImage, Space};
-//use crate::path_state::traits::{WorldLineDimensions, WorldLinePositionAccess};
+use super::traits::Space;
+//use crate::path::traits::{WorldLineDimensions, WorldLinePositionAccess};
 use ndarray::{Array1, Array2, ArrayView1, ArrayView2};
 
 /// A struct to represent a box with periodic boundary conditions.
@@ -127,6 +127,7 @@ impl<const D: usize> PeriodicBox<D> {
 
 impl<const D: usize> Space for PeriodicBox<D> {
     const SPATIAL_DIMENSIONS: usize = D;
+    const PERIODIC: bool = true;
 
     /// D-dimensional volume of the space
     fn volume(&self) -> f64 {
@@ -230,9 +231,7 @@ impl<const D: usize> Space for PeriodicBox<D> {
 
         diff.mapv(|x| x * x).sum().sqrt()
     }
-}
 
-impl<const D: usize> BaseImage for PeriodicBox<D> {
     fn base_image<'a, A>(&self, r: A) -> Array1<f64>
     where
         A: Into<ArrayView1<'a, f64>>,

@@ -1,19 +1,18 @@
-use super::accepted_update::AcceptedUpdate;
-use super::levy_staging::levy_staging;
-use super::monte_carlo_update::MonteCarloUpdate;
-use super::proposed_update::ProposedUpdate;
-use crate::path_state::traits::{
-    WorldLineBatchPositions, WorldLineDimensions, WorldLinePermutationAccess,
-    WorldLinePositionAccess, WorldLineWormAccess,
-};
-use log::{debug, trace};
-use ndarray::{Array1, Array2};
-//use ndarray::linalg::norm_l2;
 use crate::action::traits::PotentialDensityMatrix;
-//use crate::space::traits::Space;
+use crate::impl_tunable_parameters;
+use crate::monte_carlo::accepted_update::AcceptedUpdate;
+use crate::monte_carlo::levy_staging::levy_staging;
+use crate::monte_carlo::proposed_update::ProposedUpdate;
+use crate::monte_carlo::traits::{MonteCarloStep, MonteCarloTunable};
+use crate::path::traits::{
+    WorldLineBatchPositions, WorldLineDimensions, WorldLinePermutationAccess,
+    WorldLinePositionAccess, WorldLineStateEq, WorldLineWormAccess,
+};
 use crate::space::traits::Space;
 use crate::system::traits::SystemAccess;
-use rand::distributions::WeightedIndex;
+use log::{debug, trace};
+use ndarray::{Array1, Array2};
+use rand_distr::weighted::WeightedIndex;
 use rand_distr::Distribution;
 
 /// A Monte Carlo update that glues a polymer to the tail of the worm, thus sampling permutations.
@@ -21,44 +20,43 @@ use rand_distr::Distribution;
 /// # Fields
 /// - `min_delta_t`: Minimum time slices to redraw. Must be greater than 1.
 /// - `max_delta_t`: Maximum time slices to redraw. Must be greater than or equal to `min_delta_t`.
-/// - `accept_count`: Tracks the number of updates that have been accepted.
-/// - `reject_count`: Tracks the number of updates that have been rejected.
 ///
 /// # Implementation Details
 /// - It takes into account the space periodicity to satisfy the detailed balance condition.
 /// - It doesn't require the polymers to have the initial slice within the fundamental cell.
+#[derive(Debug, Clone, Copy)]
 pub struct Swap {
     /// The minimum extent of the segment to redraw, in time slices.
     /// Must be greater than 1.
-    pub min_delta_t: usize,
+    min_delta_t: usize,
 
     /// The maximum extent of the segment to redraw, in time slices.
     /// Must be greater than or equal to `min_delta_t`.
-    pub max_delta_t: usize,
-
-    /// Tracks the number of updates that have been accepted.
-    pub accept_count: usize,
-
-    /// Tracks the number of updates that have been rejected.
-    pub reject_count: usize,
+    max_delta_t: usize,
 }
 
-impl<S, A> MonteCarloUpdate<S, A> for Swap
+impl Swap {
+    pub fn new(min_delta_t: usize, max_delta_t: usize) -> Self {
+        Self {
+            min_delta_t,
+            max_delta_t,
+        }
+    }
+}
+
+impl<S, A, R> MonteCarloStep<S, A, R> for Swap
 where
     S: SystemAccess,
     S::WorldLine: WorldLineDimensions
         + WorldLinePositionAccess
         + WorldLineWormAccess
         + WorldLinePermutationAccess
-        + WorldLineBatchPositions,
+        + WorldLineBatchPositions
+        + WorldLineStateEq,
     A: PotentialDensityMatrix,
+    R: rand::Rng,
 {
-    fn monte_carlo_update(
-        &mut self,
-        system: &mut S,
-        action: &A,
-        rng: &mut impl rand::Rng,
-    ) -> Option<AcceptedUpdate> {
+    fn step(&mut self, system: &mut S, action: &A, rng: &mut R) -> Option<AcceptedUpdate> {
         debug!("Trying update");
 
         let tot_slices = S::WorldLine::TIME_SLICES;
@@ -75,7 +73,7 @@ where
         let head = worldlines.worm_head().unwrap();
 
         // Randomly select the extent of the polymer to redraw
-        let delta_t: usize = rng.gen_range(self.min_delta_t..=self.max_delta_t);
+        let delta_t: usize = rng.random_range(self.min_delta_t..=self.max_delta_t);
 
         // Pivot slice
         let t0 = tot_slices - delta_t - 1;
@@ -111,7 +109,17 @@ where
                 (-distance_sq / (2.0 * two_lambda_tau * delta_t as f64)).exp()
             })
             .collect();
+
+        // Cannot swap with head (would lose the worm)
         weights[head] = 0.0;
+
+        // Swap only allowed on beads with the same internal state
+        for (i, weight) in weights.iter_mut().enumerate() {
+            if !worldlines.beads_state_eq(tail, 0, i, tot_slices - 1) {
+                *weight = 0.0;
+            }
+        }
+
         trace!("Weights: {:?}", weights);
         let sum_weights: f64 = weights.sum();
         if !sum_weights.is_normal() {
@@ -184,24 +192,16 @@ where
         trace!("Acceptance ratio: {}", acceptance_ratio);
 
         // Apply Metropolis-Hastings acceptance criterion
-        let proba = rng.gen::<f64>();
+        let proba = rng.random::<f64>();
         trace!("Drawn probability: {}", proba);
         if proba < acceptance_ratio {
             // Accept the update
             let worldlines_mut = system.path_mut();
-            for particle in proposal.get_modified_particles() {
-                if let Some(modifications) = proposal.get_modifications(particle) {
-                    for (range, new_positions) in modifications {
-                        worldlines_mut.set_positions(
-                            particle,
-                            range.start,
-                            range.end,
-                            new_positions,
-                        );
-                    }
+            if let Some(modifications) = proposal.get_modifications(p0) {
+                for (range, new_positions) in modifications {
+                    worldlines_mut.set_positions(p0, range.start, range.end, new_positions);
                 }
             }
-            self.accept_count += 1;
             debug!("Move accepted");
 
             // Update the permutations
@@ -215,12 +215,17 @@ where
                 worldlines_mut.worm_tail().unwrap()
             );
 
+            // Bring the modified polymer to its standard form
+            system.post_update_refactor(p0);
+
             Some(proposal.to_accepted_update())
         } else {
             // Reject the update
-            self.reject_count += 1;
             debug!("Move rejected");
             None
         }
     }
 }
+
+// Inject the parameter tuning methods
+impl_tunable_parameters!(Swap, (min_delta_t, usize), (max_delta_t, usize));

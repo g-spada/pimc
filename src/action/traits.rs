@@ -1,5 +1,5 @@
+use crate::monte_carlo::proposed_update::ProposedUpdate;
 use crate::system::traits::SystemAccess;
-use crate::updates::proposed_update::ProposedUpdate;
 
 /// One-Body external potential
 pub trait OneBodyPotential {
@@ -12,9 +12,9 @@ pub trait PairPotential {
 }
 
 /// Potential density matrix
-pub trait PotentialDensityMatrix{
-    fn potential_density_matrix<S: SystemAccess> (&self, system: &S) -> f64;
-    fn potential_density_matrix_update<S: SystemAccess> (
+pub trait PotentialDensityMatrix {
+    fn potential_density_matrix<S: SystemAccess>(&self, system: &S) -> f64;
+    fn potential_density_matrix_update<S: SystemAccess>(
         &self,
         system: &S,
         update: &ProposedUpdate<f64>,

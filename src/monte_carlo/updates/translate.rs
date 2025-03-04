@@ -1,38 +1,42 @@
-use super::accepted_update::AcceptedUpdate;
-use super::monte_carlo_update::MonteCarloUpdate;
-use super::proposed_update::ProposedUpdate;
 use crate::action::traits::PotentialDensityMatrix;
-use crate::path_state::sector::Sector;
-use crate::path_state::traits::{
+use crate::impl_tunable_parameters;
+use crate::monte_carlo::accepted_update::AcceptedUpdate;
+use crate::monte_carlo::proposed_update::ProposedUpdate;
+use crate::monte_carlo::traits::{MonteCarloStep, MonteCarloTunable};
+use crate::path::sector::Sector;
+use crate::path::traits::{
     WorldLineDimensions, WorldLinePermutationAccess, WorldLinePositionAccess, WorldLineWormAccess,
 };
-use crate::path_state::traverse_polymer::traverse_polymer;
+use crate::path::traverse_polymer::traverse_polymer;
 use crate::system::traits::SystemAccess;
 use log::{debug, trace};
 use ndarray::Array1;
 
 /// A Monte Carlo update that translates both open and closed polymers.
-pub struct WormTranslate {
-    pub max_displacement: f64,
-    pub accept_count: usize,
-    pub reject_count: usize,
+#[derive(Debug, Clone, Copy)]
+pub struct Translate {
+    max_displacement: f64,
 }
 
-impl WormTranslate {
+impl Translate {
     fn select_initial_particle<W>(&self, worldlines: &W, rng: &mut impl rand::Rng) -> usize
     where
         W: WorldLinePermutationAccess + WorldLineWormAccess + WorldLineDimensions,
     {
-        let mut p0: usize = rng.gen_range(0..worldlines.particles());
+        let mut p0: usize = rng.random_range(0..worldlines.particles());
         if worldlines.sector() == Sector::G {
             // Traverse polymer to detect closed or open configuration.
             p0 = traverse_polymer(worldlines, p0);
         }
         p0
     }
+
+    pub fn new(max_displacement: f64) -> Self {
+        Self { max_displacement }
+    }
 }
 
-impl<S, A> MonteCarloUpdate<S, A> for WormTranslate
+impl<S, A, R> MonteCarloStep<S, A, R> for Translate
 where
     S: SystemAccess,
     S::WorldLine: WorldLineDimensions
@@ -40,13 +44,9 @@ where
         + WorldLinePermutationAccess
         + WorldLineWormAccess,
     A: PotentialDensityMatrix,
+    R: rand::Rng,
 {
-    fn monte_carlo_update(
-        &mut self,
-        system: &mut S,
-        action: &A,
-        rng: &mut impl rand::Rng,
-    ) -> Option<AcceptedUpdate> {
+    fn step(&mut self, system: &mut S, action: &A, rng: &mut R) -> Option<AcceptedUpdate> {
         debug!("Trying update");
         let mut proposal = ProposedUpdate::new();
 
@@ -60,7 +60,7 @@ where
 
         // Generate displacement
         let displacement: Array1<f64> = (0..tot_directions)
-            .map(|_| rng.gen_range(-self.max_displacement..=self.max_displacement))
+            .map(|_| rng.random_range(-self.max_displacement..=self.max_displacement))
             .collect();
         trace!("Displacement vector {:?}", displacement);
 
@@ -95,7 +95,7 @@ where
         trace!("Acceptance ratio {:}", acceptance_ratio);
 
         // Apply Metropolis-Hastings acceptance criterion
-        let proba = rng.gen::<f64>();
+        let proba = rng.random::<f64>();
         trace!("Drawn probability: {}", proba);
         if proba < acceptance_ratio {
             // Accept the update
@@ -112,14 +112,21 @@ where
                     }
                 }
             }
-            self.accept_count += 1;
             debug!("Move accepted");
+
+            // Bring the modified polymer to its standard form
+            for particle in proposal.get_modified_particles() {
+                system.post_update_refactor(particle);
+            }
+
             Some(proposal.to_accepted_update())
         } else {
             // Reject the update
-            self.reject_count += 1;
             debug!("Move rejected");
             None
         }
     }
 }
+
+// Inject the parameter tuning methods
+impl_tunable_parameters!(Translate, (max_displacement, f64));

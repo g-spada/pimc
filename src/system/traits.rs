@@ -1,4 +1,4 @@
-use crate::path_state::traits::WorldLineDimensions;
+use crate::path::traits::WorldLineDimensions;
 use crate::space::traits::Space;
 
 pub trait SystemAccess {
@@ -9,8 +9,5 @@ pub trait SystemAccess {
     fn two_lambda_tau(&self, particle: usize) -> f64;
     fn path(&self) -> &Self::WorldLine;
     fn path_mut(&mut self) -> &mut Self::WorldLine;
-}
-
-pub trait ReseatPolymer {
-    fn reseat_polymer(&mut self, particle: usize);
+    fn post_update_refactor(&mut self, particle: usize);
 }

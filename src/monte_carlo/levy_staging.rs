@@ -26,21 +26,20 @@ use rand_distr::{Distribution, Normal};
 /// - If the number of slices in `polymer` is less than 2.
 ///
 /// # References
-/// - W. Krauth, "Statistical Mechanics: Algorithms and Computations", OUP Oxford, 2006, 
+/// - W. Krauth, "Statistical Mechanics: Algorithms and Computations", OUP Oxford, 2006,
 ///   [<https://doi.org/10.1093/oso/9780198515357.001.0001>], Algorithm 3.5, p.154 (with different normalization).
 /// - Condens. Matter 2022, 7, 30, Eq. (27) [<http://arxiv.org/abs/2203.00010>]
 ///   *Note*: This reference contains a typo in the last denominator (extra π).
 ///
 /// # Example
 /// ```rust
-/// use pimc::updates::levy_staging::levy_staging;
+/// use pimc::monte_carlo::levy_staging::levy_staging;
 /// use ndarray::Array2;
-/// use rand::thread_rng;
 ///
 /// // Initialize a polymer with 3 time slices and 2 spatial dimensions
 /// let mut polymer = Array2::from_shape_vec((3, 2), vec![0.0, 0.0, 1.0, 1.0, 2.0, 2.0]).unwrap();
 /// let two_lambda_tau = 1.0;
-/// let mut rng = thread_rng();
+/// let mut rng = rand::rng();
 ///
 /// // Modify the intermediate slice using Levy's staging algorithm
 /// levy_staging(&mut polymer, two_lambda_tau, &mut rng);
@@ -87,14 +86,13 @@ where
 mod tests {
     use super::*;
     use ndarray::Array2;
-    use rand::thread_rng;
 
     #[test]
     fn test_levy_staging_basic() {
         let mut polymer =
             Array2::from_shape_vec((3, 2), vec![0.0, 0.0, 1.0, 1.0, 2.0, 2.0]).unwrap();
         let two_lambda_tau = 1.0;
-        let mut rng = thread_rng();
+        let mut rng = rand::rng();
 
         // Modify the intermediate slice
         levy_staging(&mut polymer, two_lambda_tau, &mut rng);
@@ -117,7 +115,7 @@ mod tests {
 
         // With vanishing two_lambda_tau the sampled positions are deterministic
         let two_lambda_tau = 0.0;
-        let mut rng = thread_rng();
+        let mut rng = rand::rng();
 
         // Modify the intermediate slice
         levy_staging(&mut polymer, two_lambda_tau, &mut rng);
@@ -137,7 +135,7 @@ mod tests {
     fn test_levy_staging_invalid_two_lambda_tau() {
         let mut polymer = Array2::zeros((3, 2));
         let two_lambda_tau = -1.0; // Invalid value
-        let mut rng = thread_rng();
+        let mut rng = rand::rng();
 
         // This should panic
         levy_staging(&mut polymer, two_lambda_tau, &mut rng);
@@ -148,7 +146,7 @@ mod tests {
     fn test_levy_staging_insufficient_slices() {
         let mut polymer = Array2::zeros((1, 2)); // Only one slice
         let two_lambda_tau = 1.0;
-        let mut rng = thread_rng();
+        let mut rng = rand::rng();
 
         // This should panic
         levy_staging(&mut polymer, two_lambda_tau, &mut rng);
@@ -162,7 +160,7 @@ mod tests {
         )
         .unwrap();
         let two_lambda_tau = 2.0;
-        let mut rng = thread_rng();
+        let mut rng = rand::rng();
 
         // Modify intermediate slices
         levy_staging(&mut polymer, two_lambda_tau, &mut rng);
@@ -191,7 +189,7 @@ mod tests {
         )
         .unwrap();
         let two_lambda_tau = 2.0;
-        let mut rng = thread_rng();
+        let mut rng = rand::rng();
 
         // Extract only the first column as a mutable view
         {

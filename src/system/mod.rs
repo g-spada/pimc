@@ -1,2 +1,2 @@
-pub mod traits; 
 pub mod homonuclear_system;
+pub mod traits;
