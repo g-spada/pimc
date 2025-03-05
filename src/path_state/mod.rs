@@ -5,4 +5,3 @@ pub mod spin;
 pub mod spin_path_configuration;
 pub mod traits;
 pub mod traverse_polymer;
-pub mod worldlines;
