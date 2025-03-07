@@ -80,13 +80,24 @@ pub trait WorldLineWormAccess {
 /// Trait for accessing and modifying particle internal quantum states of the worldlines.
 pub trait WorldLineStateAccess {
     /// Associated type for the particle quantum state type.
-    type State;
+    type State: Eq;
 
     /// Gets the state of a specific particle at a specific time slice.
     fn state(&self, particle: usize, time_slice: usize) -> Self::State;
 
     /// Sets the state of a specific particle at a specific time slice.
     fn set_state(&mut self, particle: usize, time_slice: usize, state: Self::State);
+}
+
+/// Trait for checking the equality of quantum states
+pub trait WorldLineStateEq {
+    fn worldline_state_eq(
+        self,
+        particle1: usize,
+        slice1: usize,
+        particle2: usize,
+        slice2: usize,
+    ) -> bool;
 }
 
 //pub trait WorldLineBase: WorldLineDimensions + WorldLinePositionAccess {}

@@ -2,7 +2,7 @@ use super::sector::Sector;
 use super::spin::Spin;
 use super::traits::{
     WorldLineBatchPositions, WorldLineDimensions, WorldLinePermutationAccess,
-    WorldLinePositionAccess, WorldLineWormAccess,
+    WorldLinePositionAccess, WorldLineStateAccess, WorldLineStateEq, WorldLineWormAccess,
 };
 use ndarray::{
     arr1, s, Array, Array1, Array2, Array3, ArrayView1, ArrayView2, ArrayViewMut1, ArrayViewMut2,
@@ -765,6 +765,37 @@ impl<const N: usize, const M: usize, const D: usize> WorldLineBatchPositions
     }
 }
 
+impl<const N: usize, const M: usize, const D: usize> WorldLineStateAccess
+    for SpinPathConfiguration<N, M, D>
+{
+    /// Associated type for the particle quantum state type.
+    type State = Spin;
+
+    /// Gets the state of a specific particle at a specific time slice.
+    fn state(&self, particle: usize, time_slice: usize) -> Self::State {
+        self.spin(particle, time_slice)
+    }
+
+    /// Sets the state of a specific particle at a specific time slice.
+    fn set_state(&mut self, particle: usize, time_slice: usize, state: Self::State) {
+        self.set_spin(particle, time_slice, state)
+    }
+}
+
+impl<const N: usize, const M: usize, const D: usize> WorldLineStateEq
+    for SpinPathConfiguration<N, M, D>
+{
+    fn worldline_state_eq(
+        self,
+        particle1: usize,
+        slice1: usize,
+        particle2: usize,
+        slice2: usize,
+    ) -> bool {
+        self.state(particle1, slice1) == self.state(particle2, slice2)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -869,6 +900,17 @@ mod tests {
             } else {
                 assert_eq!(world.spin(1, time_slice), Spin::Up);
             }
+        }
+
+        for time_slice in 0..M {
+            assert_eq!(world.spin(0, time_slice), Spin::Up);
+        }
+
+        for time_slice in (0..M).step_by(2) {
+            assert_eq!(world.spin(1, time_slice), Spin::Dn);
+        }
+        for time_slice in (1..M).step_by(2) {
+            assert_eq!(world.spin(1, time_slice), Spin::Up);
         }
     }
 

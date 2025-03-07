@@ -1,7 +1,7 @@
 use super::sector::Sector;
 use super::traits::{
     WorldLineBatchPositions, WorldLineDimensions, WorldLinePermutationAccess,
-    WorldLinePositionAccess, WorldLineWormAccess,
+    WorldLinePositionAccess, WorldLineStateEq, WorldLineWormAccess,
 };
 use ndarray::{
     arr1, s, Array, Array1, Array2, Array3, ArrayView1, ArrayView2, ArrayViewMut1, ArrayViewMut2,
@@ -678,6 +678,14 @@ impl<const N: usize, const M: usize, const D: usize> WorldLineBatchPositions
 
         // Slice and return the positions of all particles at the given time slice
         self.positions.slice(s![.., time_slice, ..])
+    }
+}
+
+impl<const N: usize, const M: usize, const D: usize> WorldLineStateEq
+    for PathConfiguration<N, M, D>
+{
+    fn worldline_state_eq(self, _: usize, _: usize, _: usize, _: usize) -> bool {
+        true
     }
 }
 
