@@ -1,6 +1,9 @@
 use super::accepted_update::AcceptedUpdate;
 
-pub trait MonteCarloUpdate<S,A> {
+pub trait MonteCarloUpdate<S, A, R>
+where
+    R: rand::Rng,
+{
     /// Apply the Monte Carlo update.
     ///
     /// # Returns
@@ -9,6 +12,6 @@ pub trait MonteCarloUpdate<S,A> {
         &mut self,
         system: &mut S,
         action: &A,
-        rng: &mut impl rand::Rng,
+        rng: &mut R,
     ) -> Option<AcceptedUpdate>;
 }

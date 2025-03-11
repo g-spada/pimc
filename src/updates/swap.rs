@@ -4,7 +4,7 @@ use super::monte_carlo_update::MonteCarloUpdate;
 use super::proposed_update::ProposedUpdate;
 use crate::path_state::traits::{
     WorldLineBatchPositions, WorldLineDimensions, WorldLinePermutationAccess,
-    WorldLinePositionAccess, WorldLineWormAccess,
+    WorldLinePositionAccess, WorldLineStateEq, WorldLineWormAccess,
 };
 use log::{debug, trace};
 use ndarray::{Array1, Array2};
@@ -27,6 +27,7 @@ use rand_distr::Distribution;
 /// # Implementation Details
 /// - It takes into account the space periodicity to satisfy the detailed balance condition.
 /// - It doesn't require the polymers to have the initial slice within the fundamental cell.
+#[derive(Debug)]
 pub struct Swap {
     /// The minimum extent of the segment to redraw, in time slices.
     /// Must be greater than 1.
@@ -43,21 +44,23 @@ pub struct Swap {
     pub reject_count: usize,
 }
 
-impl<S, A> MonteCarloUpdate<S, A> for Swap
+impl<S, A, R> MonteCarloUpdate<S, A, R> for Swap
 where
     S: SystemAccess,
     S::WorldLine: WorldLineDimensions
         + WorldLinePositionAccess
         + WorldLineWormAccess
         + WorldLinePermutationAccess
-        + WorldLineBatchPositions,
+        + WorldLineBatchPositions
+        + WorldLineStateEq,
     A: PotentialDensityMatrix,
+    R: rand::Rng,
 {
     fn monte_carlo_update(
         &mut self,
         system: &mut S,
         action: &A,
-        rng: &mut impl rand::Rng,
+        rng: &mut R,
     ) -> Option<AcceptedUpdate> {
         debug!("Trying update");
 
@@ -111,7 +114,17 @@ where
                 (-distance_sq / (2.0 * two_lambda_tau * delta_t as f64)).exp()
             })
             .collect();
+
+        // Cannot swap with head (would lose the worm)
         weights[head] = 0.0;
+
+        // Swap only allowed on beads with the same internal state
+        for (i, weight) in weights.iter_mut().enumerate() {
+            if !worldlines.beads_state_eq(tail, 0, i, tot_slices - 1) {
+                *weight = 0.0;
+            }
+        }
+
         trace!("Weights: {:?}", weights);
         let sum_weights: f64 = weights.sum();
         if !sum_weights.is_normal() {

@@ -5,7 +5,8 @@ use super::proposed_update::ProposedUpdate;
 use crate::action::traits::PotentialDensityMatrix;
 use crate::path_state::sector::Sector;
 use crate::path_state::traits::{
-    WorldLineDimensions, WorldLinePermutationAccess, WorldLinePositionAccess, WorldLineWormAccess,
+    WorldLineDimensions, WorldLinePermutationAccess, WorldLinePositionAccess, WorldLineStateEq,
+    WorldLineWormAccess,
 };
 use crate::space::traits::Space;
 use crate::system::traits::SystemAccess;
@@ -32,6 +33,7 @@ use std::f64::consts::PI;
 /// - The new head is proposed with a free particle distribution. Detailed balance for systems with
 ///   periodic boundary conditions is ensured by rejecting updates with head too far away from the
 ///   corresponding image of the tail.
+#[derive(Debug)]
 pub struct OpenClose {
     pub min_delta_t: usize,
     pub max_delta_t: usize,
@@ -41,19 +43,21 @@ pub struct OpenClose {
 }
 
 impl OpenClose {
-    fn open_polymer<S, A>(
+    fn open_polymer<S, A, R>(
         &mut self,
         system: &mut S,
         action: &A,
-        rng: &mut impl rand::Rng,
+        rng: &mut R,
     ) -> Option<AcceptedUpdate>
     where
         S: SystemAccess,
         S::WorldLine: WorldLineDimensions
             + WorldLinePositionAccess
             + WorldLinePermutationAccess
+            + WorldLineStateEq
             + WorldLineWormAccess,
         A: PotentialDensityMatrix,
+        R: rand::Rng,
     {
         let worldlines = system.path();
         let tot_particles = worldlines.particles();
@@ -189,6 +193,7 @@ impl OpenClose {
         S::WorldLine: WorldLineDimensions
             + WorldLinePositionAccess
             + WorldLinePermutationAccess
+            + WorldLineStateEq
             + WorldLineWormAccess,
         A: PotentialDensityMatrix,
     {
@@ -196,16 +201,23 @@ impl OpenClose {
         let tot_slices = S::WorldLine::TIME_SLICES;
         let tot_directions = S::WorldLine::SPATIAL_DIMENSIONS;
 
+        let head = worldlines.worm_head().unwrap();
+        let head_position = worldlines.position(head, tot_slices - 1);
+        let tail = worldlines.worm_tail().unwrap();
+        let tail_position = worldlines.position(tail, 0);
+
+        // Reject the update if the internal state of head and tail differs
+        if !worldlines.beads_state_eq(head, tot_slices - 1, tail, 0) {
+            trace!("Internal quantum state of Head and Tail differs. Cannot close");
+            return None;
+        }
+
         // Randomly select the extent of the polymer to redraw. The segment is composed by `delta_t + 1` beads.
         // The first bead is kept fixed, the remaining `delta_t` beads are redrawn.
         let delta_t: usize = rng.gen_range(self.min_delta_t..=self.max_delta_t);
         // Initial slice
         let t0 = tot_slices - delta_t - 1;
 
-        let head = worldlines.worm_head().unwrap();
-        let head_position = worldlines.position(head, tot_slices - 1);
-        let tail = worldlines.worm_tail().unwrap();
-        let tail_position = worldlines.position(tail, 0);
         let pivot_position = worldlines.position(head, t0);
 
         // Get two_lambda_tau value for particle
@@ -297,20 +309,22 @@ impl OpenClose {
     }
 }
 
-impl<S, A> MonteCarloUpdate<S, A> for OpenClose
+impl<S, A, R> MonteCarloUpdate<S, A, R> for OpenClose
 where
     S: SystemAccess,
     S::WorldLine: WorldLineDimensions
         + WorldLinePositionAccess
         + WorldLinePermutationAccess
+        + WorldLineStateEq
         + WorldLineWormAccess,
     A: PotentialDensityMatrix,
+    R: rand::Rng,
 {
     fn monte_carlo_update(
         &mut self,
         system: &mut S,
         action: &A,
-        rng: &mut impl rand::Rng,
+        rng: &mut R,
     ) -> Option<AcceptedUpdate> {
         if rng.gen::<f64>() < 0.5 {
             // Try to open

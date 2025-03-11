@@ -5,7 +5,8 @@ use super::proposed_update::ProposedUpdate;
 use crate::action::traits::PotentialDensityMatrix;
 use crate::path_state::sector::Sector;
 use crate::path_state::traits::{
-    WorldLineDimensions, WorldLinePermutationAccess, WorldLinePositionAccess, WorldLineWormAccess,
+    WorldLineDimensions, WorldLinePermutationAccess, WorldLinePositionAccess, WorldLineStateEq,
+    WorldLineWormAccess,
 };
 use crate::space::traits::Space;
 use crate::system::traits::SystemAccess;
@@ -28,13 +29,14 @@ use ndarray::Array2;
 /// - `reject_count`: Tracks the number of updates that have been rejected.
 ///
 /// # Implementation Details
-/// - New head is proposed with a uniform distribution within the interval 
+/// - New head is proposed with a uniform distribution within the interval
 ///   [-max_head_displacement, max_head_displacement] for each spatial dimension.
 ///
 /// # References
 /// - Condens. Matter 2022, 7, 30, [<http://arxiv.org/abs/2203.00010>]
 ///   *Note*: Here we make use of a different definition for the open_close_constant that
 ///   incorporates the factor "tot_particles/volume".
+#[derive(Debug)]
 pub struct OpenCloseUniform {
     pub min_delta_t: usize,
     pub max_delta_t: usize,
@@ -45,11 +47,11 @@ pub struct OpenCloseUniform {
 }
 
 impl OpenCloseUniform {
-    fn open_polymer<S, A>(
+    fn open_polymer<S, A, R>(
         &mut self,
         system: &mut S,
         action: &A,
-        rng: &mut impl rand::Rng,
+        rng: &mut R,
     ) -> Option<AcceptedUpdate>
     where
         S: SystemAccess,
@@ -58,6 +60,7 @@ impl OpenCloseUniform {
             + WorldLinePermutationAccess
             + WorldLineWormAccess,
         A: PotentialDensityMatrix,
+        R: rand::Rng,
     {
         let worldlines = system.path();
         let tot_particles = worldlines.particles();
@@ -180,19 +183,21 @@ impl OpenCloseUniform {
         }
     }
 
-    fn close_polymer<S, A>(
+    fn close_polymer<S, A, R>(
         &mut self,
         system: &mut S,
         action: &A,
-        rng: &mut impl rand::Rng,
+        rng: &mut R,
     ) -> Option<AcceptedUpdate>
     where
         S: SystemAccess,
         S::WorldLine: WorldLineDimensions
             + WorldLinePositionAccess
             + WorldLinePermutationAccess
+            + WorldLineStateEq
             + WorldLineWormAccess,
         A: PotentialDensityMatrix,
+        R: rand::Rng,
     {
         let worldlines = system.path();
         //let tot_particles = worldlines.particles();
@@ -209,6 +214,14 @@ impl OpenCloseUniform {
         let head_position = worldlines.position(head, tot_slices - 1);
         let tail = worldlines.worm_tail().unwrap();
         let tail_position = worldlines.position(tail, 0);
+
+        
+        // Reject the update if the internal state of head and tail differs
+        if !worldlines.beads_state_eq(head, tot_slices - 1, tail, 0) {
+            trace!("Internal quantum state of Head and Tail differs. Cannot close");
+            return None;
+        }
+
         // Get two_lambda_tau value for particle
         let two_lambda_tau = system.two_lambda_tau(head);
         // Check if TAIL and HEAD are close enough
@@ -219,7 +232,10 @@ impl OpenCloseUniform {
         );
 
         let tail_head_distance = system.space().difference(tail_position, head_position);
-        trace!("Vector distance between head and tail (computed by space): {:#?}", tail_head_distance);
+        trace!(
+            "Vector distance between head and tail (computed by space): {:#?}",
+            tail_head_distance
+        );
 
         if tail_head_distance
             .iter()
@@ -322,20 +338,22 @@ impl OpenCloseUniform {
     }
 }
 
-impl<S, A> MonteCarloUpdate<S, A> for OpenCloseUniform
+impl<S, A, R> MonteCarloUpdate<S, A, R> for OpenCloseUniform
 where
     S: SystemAccess,
     S::WorldLine: WorldLineDimensions
         + WorldLinePositionAccess
         + WorldLinePermutationAccess
+        + WorldLineStateEq
         + WorldLineWormAccess,
     A: PotentialDensityMatrix,
+    R: rand::Rng,
 {
     fn monte_carlo_update(
         &mut self,
         system: &mut S,
         action: &A,
-        rng: &mut impl rand::Rng,
+        rng: &mut R,
     ) -> Option<AcceptedUpdate> {
         if rng.gen::<f64>() < 0.5 {
             // Try to open

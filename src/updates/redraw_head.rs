@@ -23,6 +23,7 @@ use rand_distr::{Distribution, Normal};
 /// - `max_delta_t`: The maximum length (in time slices) of a segment to redraw. Must be greater than or equal to `min_delta_t`.
 /// - `accept_count`: Tracks the number of updates that have been accepted.
 /// - `reject_count`: Tracks the number of updates that have been rejected.
+#[derive(Debug)]
 pub struct RedrawHead {
     /// The minimum extent of the segment to redraw, in time slices.
     /// Must be greater than 1.
@@ -39,17 +40,18 @@ pub struct RedrawHead {
     pub reject_count: usize,
 }
 
-impl<S, A> MonteCarloUpdate<S, A> for RedrawHead
+impl<S, A, R> MonteCarloUpdate<S, A, R> for RedrawHead
 where
     S: SystemAccess,
     S::WorldLine: WorldLineDimensions + WorldLinePositionAccess + WorldLineWormAccess,
     A: PotentialDensityMatrix,
+    R: rand::Rng,
 {
     fn monte_carlo_update(
         &mut self,
         system: &mut S,
         action: &A,
-        rng: &mut impl rand::Rng,
+        rng: &mut R,
     ) -> Option<AcceptedUpdate> {
         debug!("Trying update");
         let worldlines = system.path();

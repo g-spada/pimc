@@ -21,6 +21,7 @@ use ndarray::{s, Array2};
 /// - `max_delta_t`: The maximum length (in time slices) of a segment to redraw. Must be greater than or equal to `min_delta_t`.
 /// - `accept_count`: Tracks the number of updates that have been accepted.
 /// - `reject_count`: Tracks the number of updates that have been rejected.
+#[derive(Debug)]
 pub struct Redraw {
     /// The minimum extent of the segment to redraw, in time slices.
     /// Must be greater than 1.
@@ -37,17 +38,18 @@ pub struct Redraw {
     pub reject_count: usize,
 }
 
-impl<S, A> MonteCarloUpdate<S, A> for Redraw
+impl<S, A, R> MonteCarloUpdate<S, A, R> for Redraw
 where
     S: SystemAccess,
     S::WorldLine: WorldLineDimensions + WorldLinePositionAccess + WorldLinePermutationAccess,
     A: PotentialDensityMatrix,
+    R: rand::Rng,
 {
     fn monte_carlo_update(
         &mut self,
         system: &mut S,
         action: &A,
-        rng: &mut impl rand::Rng,
+        rng: &mut R,
     ) -> Option<AcceptedUpdate> {
         debug!("Trying update");
         let worldlines = system.path();
@@ -148,7 +150,12 @@ where
             for particle in proposal.get_modified_particles() {
                 if let Some(modifications) = proposal.get_modifications(particle) {
                     for (range, new_positions) in modifications {
-                        worldlines_mut.set_positions(particle, range.start, range.end, new_positions);
+                        worldlines_mut.set_positions(
+                            particle,
+                            range.start,
+                            range.end,
+                            new_positions,
+                        );
                     }
                 }
             }

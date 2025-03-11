@@ -12,6 +12,7 @@ use log::{debug, trace};
 use ndarray::Array1;
 
 /// A Monte Carlo update that translates both open and closed polymers.
+#[derive(Debug)]
 pub struct WormTranslate {
     pub max_displacement: f64,
     pub accept_count: usize,
@@ -32,7 +33,7 @@ impl WormTranslate {
     }
 }
 
-impl<S, A> MonteCarloUpdate<S, A> for WormTranslate
+impl<S, A, R> MonteCarloUpdate<S, A, R> for WormTranslate
 where
     S: SystemAccess,
     S::WorldLine: WorldLineDimensions
@@ -40,12 +41,13 @@ where
         + WorldLinePermutationAccess
         + WorldLineWormAccess,
     A: PotentialDensityMatrix,
+    R: rand::Rng,
 {
     fn monte_carlo_update(
         &mut self,
         system: &mut S,
         action: &A,
-        rng: &mut impl rand::Rng,
+        rng: &mut R,
     ) -> Option<AcceptedUpdate> {
         debug!("Trying update");
         let mut proposal = ProposedUpdate::new();
