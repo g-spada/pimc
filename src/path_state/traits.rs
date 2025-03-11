@@ -91,8 +91,8 @@ pub trait WorldLineStateAccess {
 
 /// Trait for checking the equality of quantum states
 pub trait WorldLineStateEq {
-    fn worldline_state_eq(
-        self,
+    fn beads_state_eq(
+        &self,
         particle1: usize,
         slice1: usize,
         particle2: usize,

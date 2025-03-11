@@ -684,7 +684,7 @@ impl<const N: usize, const M: usize, const D: usize> WorldLineBatchPositions
 impl<const N: usize, const M: usize, const D: usize> WorldLineStateEq
     for PathConfiguration<N, M, D>
 {
-    fn worldline_state_eq(self, _: usize, _: usize, _: usize, _: usize) -> bool {
+    fn beads_state_eq(&self, _: usize, _: usize, _: usize, _: usize) -> bool {
         true
     }
 }

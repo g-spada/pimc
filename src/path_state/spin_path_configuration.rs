@@ -785,8 +785,8 @@ impl<const N: usize, const M: usize, const D: usize> WorldLineStateAccess
 impl<const N: usize, const M: usize, const D: usize> WorldLineStateEq
     for SpinPathConfiguration<N, M, D>
 {
-    fn worldline_state_eq(
-        self,
+    fn beads_state_eq(
+        &self,
         particle1: usize,
         slice1: usize,
         particle2: usize,
@@ -908,9 +908,12 @@ mod tests {
 
         for time_slice in (0..M).step_by(2) {
             assert_eq!(world.spin(1, time_slice), Spin::Dn);
+            assert!(world.beads_state_eq(1, time_slice, 1, 0));
         }
+
         for time_slice in (1..M).step_by(2) {
             assert_eq!(world.spin(1, time_slice), Spin::Up);
+            assert!(world.beads_state_eq(1, time_slice, 1, 1));
         }
     }
 
