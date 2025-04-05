@@ -229,7 +229,8 @@ impl<const D: usize> Space for PeriodicBox<D> {
             })
             .collect();
 
-        diff.mapv(|x| x * x).sum().sqrt()
+        let squared = diff.mapv(|x| x * x);
+        squared.sum().sqrt()
     }
 
     fn base_image<'a, A>(&self, r: A) -> Array1<f64>

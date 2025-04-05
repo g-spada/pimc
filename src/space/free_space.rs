@@ -64,6 +64,7 @@ impl<const D: usize> Space for FreeSpace<D> {
         B: Into<ArrayView1<'a, f64>>,
     {
         let diff = self.difference(r1, r2);
-        diff.mapv(|x| x * x).sum().sqrt()
+        let squared = diff.mapv(|x| x * x);
+        squared.sum().sqrt()
     }
 }

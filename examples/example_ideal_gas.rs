@@ -158,10 +158,12 @@ fn main() {
                     let mut gradm_winding_sum: f64 = 0.0;
                     for particle in 0..N {
                         for slice in 0..M {
-                            gradient_pow2_sum += Zip::from(&path.position(particle, slice))
-                                .and(&path.position(particle, slice + 1))
-                                .map_collect(|&a, &b| (a - b).powi(2))
-                                .sum()
+                            let pos1 = path.position(particle, slice);
+                            let pos2 = path.position(particle, slice + 1);
+                            let squared_diffs = Zip::from(&pos1)
+                                .and(&pos2)
+                                .map_collect(|&a, &b| (a - b).powi(2));
+                            gradient_pow2_sum += squared_diffs.sum();
                         }
                         let diff_last =
                             &path.position(particle, M - 1) - &path.position(particle, M);
